@@ -13,9 +13,12 @@ The build guides and the canonical RL pipeline remain the source of truth.
 
 ## Current state
 
-- [x] Parts have arrived.
+- [x] Initial parts have arrived and were photographed for inventory.
 - [x] Repository is available locally.
 - [x] Reference firmware and Ferrolho's trained policy headers are present.
+- [x] Missing AS5600 diametric magnet identified and reordered.
+- [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
+  fine-tuning and standalone deployment are blocked until it arrives.
 - [ ] Mechanical assembly complete.
 - [ ] Electronics wired and inspected.
 - [ ] This rig has its own system-identification file.
@@ -37,18 +40,37 @@ The build guides and the canonical RL pipeline remain the source of truth.
 
 ## Phase 1 — inventory and mechanical assembly
 
-- [ ] Check the received parts against the bill of materials.
+- [x] Check the photographed parts against the bill of materials.
+- [x] Confirm a suitable supply: 12 V DC, 3 A, centre-positive.
+- [x] Confirm the recommended TMC2209 V2.0 stepper driver is present.
+- [x] Confirm the Arduino Nano, AS5600 board, motor heatsink, 608 bearing,
+  printed arm/pendulum subassembly and decoupling capacitors are present.
+- [ ] Obtain or locate the female 5.5 × 2.1 mm panel-mount barrel socket; the
+  photographed male screw-terminal plug cannot mate with the supply's male
+  plug.
+- [ ] Obtain or locate the rocker switch, 40 × 60 mm protoboard, female 2.54 mm
+  headers, hookup wire, printed base, lid and encoder boss.
+- [ ] Replace the physically oversized 22 µF 400 V electrolytic with a compact
+  22 µF, 25–50 V part suitable for the protoboard.
+- [ ] Confirm the ceramic capacitors are marked `104` (100 nF).
 - [ ] Confirm the printed pendulum contains the 2p coin specified by the model.
-- [ ] Record the actual stepper driver: TMC2209 preferred; DRV8825 supported.
-- [ ] Record the intended microstepping; the canonical setup is 1/32.
+- [x] Record the actual stepper driver: TMC2209 V2.0.
+- [ ] Confirm the stepper is the short-body 17HS4023 by label or approximately
+  22 mm body-depth measurement.
+- [ ] Record 1/32 as the intended microstepping and later make the TMC2209
+  MS1/MS2 wiring and every firmware `MICROSTEPS` value agree.
 - [ ] Photograph the parts and wiring labels before assembly.
 - [ ] Mount the NEMA17 motor and motor plate.
-- [ ] Mount the AS5600 and diametric magnet concentrically, initially without
-  permanent adhesive so the air gap can be adjusted.
+- [ ] Finish the mechanical assembly except for permanent AS5600 alignment.
+- [ ] Mount the AS5600 loosely; do not glue or permanently position it until the
+  replacement diametric magnet can be used to set the air gap.
 - [ ] Fit the arm to the motor shaft and establish a repeatable mechanical zero.
 - [ ] Fit the pendulum bearing/shaft with minimal play and friction.
 - [ ] Route the encoder wires so they remain slack throughout arm travel.
 - [ ] Secure the enclosure and clamp or weight the base.
+- [ ] Hold the motor securely and confirm the pendulum coasts for many
+  oscillations without rubbing, sticking or obvious bearing wobble.
+- [ ] Confirm the arm is tight on the motor shaft with no rotational slip.
 
 The upstream assembly page still has unresolved details. Before tightening or
 gluing anything, verify and record here or in that page:
@@ -67,8 +89,11 @@ Mechanical gate:
 
 ## Phase 2 — electronics and first power-on
 
+Work that can be completed while waiting for the magnet:
+
 - [ ] Wire the Nano, driver, motor, AS5600, power switch, barrel jack, and
   decoupling capacitors exactly as documented.
+- [ ] Leave the AS5600 mechanically adjustable even after wiring it.
 - [ ] Verify supply polarity, driver orientation, common ground, motor coil
   pairs, STEP/DIR/ENABLE pins, and AS5600 voltage requirements with power off.
 - [ ] Wire the driver's microstep pins for the selected 1/32 setting and make
@@ -78,11 +103,21 @@ Mechanical gate:
   - DRV8825 reference: about 0.45 V Vref / 0.9 A peak.
 - [ ] Identify the Nano port with `arduino-cli board list` and record it below.
 - [ ] Flash and pass `TestHeartbeat`.
+- [ ] Flash and pass `TestMotor`; confirm direction, roughly ±90° travel, smooth
+  sound, no lost steps, and safe temperatures. Do this only with the motor and
+  base secured, the arm's full sweep clear, and Vref already set.
+- [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
+- [ ] Compile all firmware sketches so missing libraries or toolchain problems
+  are solved before the magnet arrives.
+
+Work that waits for the magnet:
+
 - [ ] Flash and pass `TestEncoder`; adjust the magnet for stable readings over a
   complete revolution before fixing it permanently.
-- [ ] Flash and pass `TestMotor`; confirm direction, roughly ±90° travel, smooth
-  sound, no lost steps, and safe temperatures.
-- [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
+- [ ] Permanently secure the AS5600 and magnet only after the strength and
+  full-rotation tests pass.
+- [ ] Boot-check `LowLevelServer` and `RLControl`; both intentionally wait for
+  valid magnet detection during startup.
 
 Rig record:
 
@@ -101,7 +136,10 @@ Electrical gate:
 
 ## Phase 3 — identify this rig
 
-- [ ] Set up the Python environment from `policy/` with `uv`.
+- [ ] Set up the Python environment from `policy/` with `uv` while waiting for
+  the magnet.
+- [ ] Run software-only smoke tests and prepare the sysid command while waiting.
+- [ ] **Magnet dependency:** do not start real sysid until `TestEncoder` passes.
 - [ ] Flash `firmware/LowLevelServer` using the selected microstep setting.
 - [ ] Run the guided system-identification workflow:
 
@@ -129,6 +167,10 @@ Keep the canonical production settings together: 50 Hz, velocity mode,
 ±3.5 rad/s, four observation frames, four-tap action smoothing, mirror
 augmentation, and observation-staleness randomization over 2–20 ms.
 
+- [ ] While waiting for the magnet, verify the simulation environment and run a
+  short smoke training/evaluation if desired.
+- [ ] Postpone the full curriculum until sysid produces this rig's parameter
+  file; training now against another rig's defaults would need to be repeated.
 - [ ] Start the three-stage curriculum using this rig's sysid parameters and a
   descriptive run name:
 
@@ -259,6 +301,7 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | Date | Phase/run | Hardware/config | Result | Decision/next step |
 | --- | --- | --- | --- | --- |
 | 2026-10-21 | Planning | Parts arrived | Build not started | Inventory and assemble |
+| 2026-10-21 | Inventory | TMC2209; 12 V/3 A supply; partial mechanical assembly | AS5600 magnet absent | Magnet reordered; continue assembly, wiring and isolated bring-up |
 
 ## Definition of done
 
