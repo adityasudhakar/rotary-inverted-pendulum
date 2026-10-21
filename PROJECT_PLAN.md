@@ -17,8 +17,11 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] Repository is available locally.
 - [x] Reference firmware and Ferrolho's trained policy headers are present.
 - [x] Missing AS5600 diametric magnet identified and reordered.
+- [x] USB power-only cable identified; Micro-USB data/sync cable ordered.
 - [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
   fine-tuning and standalone deployment are blocked until it arrives.
+- [ ] **Waiting on the Micro-USB data cable.** Nano detection, flashing and
+  serial bring-up are deferred until it arrives.
 - [ ] Mechanical assembly complete.
 - [ ] Electronics wired and inspected.
 - [ ] This rig has its own system-identification file.
@@ -102,6 +105,8 @@ Work that can be completed while waiting for the magnet:
   - TMC2209 reference: about 0.9 V Vref / 0.64 A RMS.
   - DRV8825 reference: about 0.45 V Vref / 0.9 A peak.
 - [ ] Identify the Nano port with `arduino-cli board list` and record it below.
+- [ ] Resume Nano bring-up when the ordered Micro-USB data/sync cable arrives;
+  the current charging-only cable powers the board but has no D+/D− conductors.
 - [ ] Flash and pass `TestHeartbeat`.
 - [ ] Flash and pass `TestMotor`; confirm direction, roughly ±90° travel, smooth
   sound, no lost steps, and safe temperatures. Do this only with the motor and
@@ -302,6 +307,7 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | --- | --- | --- | --- | --- |
 | 2026-10-21 | Planning | Parts arrived | Build not started | Inventory and assemble |
 | 2026-10-21 | Inventory | TMC2209; 12 V/3 A supply; partial mechanical assembly | AS5600 magnet absent | Magnet reordered; continue assembly, wiring and isolated bring-up |
+| 2026-10-21 | Nano bring-up | Nano powers on; Mac sees no USB device | Cable is charging-only | Data/sync cable ordered; defer flashing and serial tests |
 
 ## Definition of done
 
