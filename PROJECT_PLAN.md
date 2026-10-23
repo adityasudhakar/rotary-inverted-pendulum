@@ -18,10 +18,13 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] Reference firmware and Ferrolho's trained policy headers are present.
 - [x] Missing AS5600 diametric magnet identified and reordered.
 - [x] USB power-only cable identified; Micro-USB data/sync cable ordered.
+- [x] Micro-USB data/sync cable arrived and confirmed working (Nano detected
+  at `/dev/cu.usbserial-1420`).
 - [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
   fine-tuning and standalone deployment are blocked until it arrives.
-- [ ] **Waiting on the Micro-USB data cable.** Nano detection, flashing and
-  serial bring-up are deferred until it arrives.
+- [ ] **Waiting on a replacement TMC2209 driver board.** The current board
+  (V985) has an internal short between VS and GND under voltage; see the
+  2026-10-22 run log entries for diagnosis details.
 - [ ] Mechanical assembly complete.
 - [ ] Electronics wired and inspected.
 - [ ] This rig has its own system-identification file.
@@ -46,20 +49,23 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] Check the photographed parts against the bill of materials.
 - [x] Confirm a suitable supply: 12 V DC, 3 A, centre-positive.
 - [x] Confirm the recommended TMC2209 V2.0 stepper driver is present.
+  Actual board is labelled V985; only DIR, GND and EN are silk-screened.
 - [x] Confirm the Arduino Nano, AS5600 board, motor heatsink, 608 bearing,
   printed arm/pendulum subassembly and decoupling capacitors are present.
-- [ ] Obtain or locate the female 5.5 × 2.1 mm panel-mount barrel socket; the
-  photographed male screw-terminal plug cannot mate with the supply's male
-  plug.
+- [x] 12 V barrel-jack cable cut and stripped; polarity verified by multimeter
+  (black wire = +12 V, white wire = GND — non-standard colours).
 - [ ] Obtain or locate the rocker switch, 40 × 60 mm protoboard, female 2.54 mm
   headers, hookup wire, printed base, lid and encoder boss.
 - [ ] Replace the physically oversized 22 µF 400 V electrolytic with a compact
   22 µF, 25–50 V part suitable for the protoboard.
 - [ ] Confirm the ceramic capacitors are marked `104` (100 nF).
 - [ ] Confirm the printed pendulum contains the 2p coin specified by the model.
-- [x] Record the actual stepper driver: TMC2209 V2.0.
-- [ ] Confirm the stepper is the short-body 17HS4023 by label or approximately
-  22 mm body-depth measurement.
+- [x] Record the actual stepper driver: TMC2209 V2.0 (board label V985).
+- [x] Confirm the stepper is a short-body NEMA17. Label reads 42BL233.0-21A
+  (non-standard naming); confirmed as a stepper by strong detent torque
+  (notchy shaft). 6-pin connector; coil pairs identified by multimeter:
+  pins 1+4 and 3+6; centre taps on pins 2 and 5 (left unconnected for
+  bipolar drive).
 - [ ] Record 1/32 as the intended microstepping and later make the TMC2209
   MS1/MS2 wiring and every firmware `MICROSTEPS` value agree.
 - [ ] Photograph the parts and wiring labels before assembly.
@@ -104,16 +110,17 @@ Work that can be completed while waiting for the magnet:
 - [ ] Set driver current limit before connecting motor power:
   - TMC2209 reference: about 0.9 V Vref / 0.64 A RMS.
   - DRV8825 reference: about 0.45 V Vref / 0.9 A peak.
-- [ ] Identify the Nano port with `arduino-cli board list` and record it below.
-- [ ] Resume Nano bring-up when the ordered Micro-USB data/sync cable arrives;
-  the current charging-only cable powers the board but has no D+/D− conductors.
+- [x] Identify the Nano port with `arduino-cli board list`: `/dev/cu.usbserial-1420`.
+- [x] Micro-USB data cable arrived and Nano detected successfully.
 - [ ] Flash and pass `TestHeartbeat`.
 - [ ] Flash and pass `TestMotor`; confirm direction, roughly ±90° travel, smooth
   sound, no lost steps, and safe temperatures. Do this only with the motor and
   base secured, the arm's full sweep clear, and Vref already set.
 - [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
-- [ ] Compile all firmware sketches so missing libraries or toolchain problems
-  are solved before the magnet arrives.
+- [x] Compile all firmware sketches so missing libraries or toolchain problems
+  are solved before the magnet arrives. `TestMotor` compiled and flashed
+  successfully to an Arduino Uno (used as stand-in; same ATmega328P).
+  AccelStepper and FastAccelStepper libraries confirmed installed.
 
 Work that waits for the magnet:
 
@@ -127,10 +134,14 @@ Work that waits for the magnet:
 Rig record:
 
 - Rig name: `________________`
-- Arduino port: `________________`
-- Driver: `________________`
-- Microsteps: `________________`
-- Vref/current setting: `________________`
+- Arduino Nano port: `/dev/cu.usbserial-1420`
+- Arduino Uno port (interim): `/dev/cu.usbmodem14701`
+- Driver: TMC2209 V985 (defective — replacement needed)
+- Motor: 42BL233.0-21A, 6-pin unipolar, coils on pins 1+4 and 3+6
+- Microsteps: 1/32 (MS1=HIGH, MS2=LOW)
+- Vref/current setting: measured 0.08 V (factory); target 0.9 V; trimpot
+  could not be adjusted (stiff or damaged)
+- 12 V supply: KDT-1230, 12 V 3 A; barrel jack cut, black=+12 V, white=GND
 - AS5600 air gap and mounting notes: `________________`
 
 Electrical gate:
@@ -308,6 +319,9 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-10-21 | Planning | Parts arrived | Build not started | Inventory and assemble |
 | 2026-10-21 | Inventory | TMC2209; 12 V/3 A supply; partial mechanical assembly | AS5600 magnet absent | Magnet reordered; continue assembly, wiring and isolated bring-up |
 | 2026-10-21 | Nano bring-up | Nano powers on; Mac sees no USB device | Cable is charging-only | Data/sync cable ordered; defer flashing and serial tests |
+| 2026-10-22 | Nano cable test | Micro-USB data cable arrived | Nano detected at `/dev/cu.usbserial-1420` | Nano cable blocker resolved |
+| 2026-10-22 | Motor ID | Motor label 42BL233.0-21A, 6-pin connector | Confirmed stepper by detent; coils: pins 1+4, 3+6; centre taps 2+5 | Wire bipolar (skip pins 2, 5) |
+| 2026-10-22 | Motor test (Uno) | Uno as stand-in; TestMotor compiled and flashed; TMC2209 wired via breadboard; 12 V supply barrel jack cut and polarity verified | TMC2209 VS shorts to GND under voltage; 12 V adapter trips overcurrent; Vref stuck at 0.08 V | TMC2209 board (V985) defective — order replacement; consider DRV8825 as interim alternative |
 
 ## Definition of done
 
