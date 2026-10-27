@@ -22,9 +22,11 @@ The build guides and the canonical RL pipeline remain the source of truth.
   at `/dev/cu.usbserial-1420`).
 - [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
   fine-tuning and standalone deployment are blocked until it arrives.
-- [ ] **Waiting on a replacement TMC2209 driver board.** The current board
-  (V985) has an internal short between VS and GND under voltage; see the
-  2026-10-22 run log entries for diagnosis details.
+- [x] **TMC2209 survived and passes the guarded motor test.** The earlier
+  VS-to-GND "short" diagnosis was caused by reversed 12 V polarity, not an
+  internal driver short. After correcting the polarity, VS-to-GND measured
+  open unpowered, the board accepted 5 V + 12 V, Vref adjusted normally, and
+  `TestMotor` turned the motor successfully from the interim Uno.
 - [ ] Mechanical assembly complete.
 - [ ] Electronics wired and inspected.
 - [ ] This rig has its own system-identification file.
@@ -52,13 +54,17 @@ The build guides and the canonical RL pipeline remain the source of truth.
   Actual board is labelled V985; only DIR, GND and EN are silk-screened.
 - [x] Confirm the Arduino Nano, AS5600 board, motor heatsink, 608 bearing,
   printed arm/pendulum subassembly and decoupling capacitors are present.
-- [x] 12 V barrel-jack cable cut and stripped; polarity verified by multimeter
-  (black wire = +12 V, white wire = GND — non-standard colours).
+- [x] 12 V barrel-jack cable cut and stripped. **Correct, meter-confirmed
+  polarity: white wire = +12 V; black wire = GND.** This counterintuitive
+  colour reversal is intentional on this cable. An earlier note stated the
+  exact opposite and was incorrect. Never infer this cable's polarity from
+  wire colour: with the cable isolated, red probe on white and black probe on
+  black must read approximately +12 V before it is connected to the rig.
 - [ ] Obtain or locate the rocker switch, 40 × 60 mm protoboard, female 2.54 mm
   headers, hookup wire, printed base, lid and encoder boss.
-- [ ] Replace the physically oversized 22 µF 400 V electrolytic with a compact
+- [x] Replace the physically oversized 22 µF 400 V electrolytic with a compact
   22 µF, 25–50 V part suitable for the protoboard.
-- [ ] Confirm the ceramic capacitors are marked `104` (100 nF).
+- [x] Confirm the ceramic capacitors are marked `104` (100 nF).
 - [ ] Confirm the printed pendulum contains the 2p coin specified by the model.
 - [x] Record the actual stepper driver: TMC2209 V2.0 (board label V985).
 - [x] Confirm the stepper is a short-body NEMA17. Label reads 42BL233.0-21A
@@ -66,7 +72,7 @@ The build guides and the canonical RL pipeline remain the source of truth.
   (notchy shaft). 6-pin connector; coil pairs identified by multimeter:
   pins 1+4 and 3+6; centre taps on pins 2 and 5 (left unconnected for
   bipolar drive).
-- [ ] Record 1/32 as the intended microstepping and later make the TMC2209
+- [x] Record 1/32 as the intended microstepping and make the TMC2209
   MS1/MS2 wiring and every firmware `MICROSTEPS` value agree.
 - [ ] Photograph the parts and wiring labels before assembly.
 - [ ] Mount the NEMA17 motor and motor plate.
@@ -103,19 +109,23 @@ Work that can be completed while waiting for the magnet:
 - [ ] Wire the Nano, driver, motor, AS5600, power switch, barrel jack, and
   decoupling capacitors exactly as documented.
 - [ ] Leave the AS5600 mechanically adjustable even after wiring it.
-- [ ] Verify supply polarity, driver orientation, common ground, motor coil
-  pairs, STEP/DIR/ENABLE pins, and AS5600 voltage requirements with power off.
-- [ ] Wire the driver's microstep pins for the selected 1/32 setting and make
+- [ ] Verify supply polarity with a meter immediately before connection, then
+  verify driver orientation, common ground, motor coil pairs,
+  STEP/DIR/ENABLE pins, and AS5600 voltage requirements with power off. On this
+  specific cut cable, **white is +12 V and black is GND**; the colours must not
+  be treated as a general convention.
+- [x] Wire the driver's microstep pins for the selected 1/32 setting and make
   every firmware `MICROSTEPS` value match.
-- [ ] Set driver current limit before connecting motor power:
+- [x] Set driver current limit before connecting motor power:
   - TMC2209 reference: about 0.9 V Vref / 0.64 A RMS.
   - DRV8825 reference: about 0.45 V Vref / 0.9 A peak.
 - [x] Identify the Nano port with `arduino-cli board list`: `/dev/cu.usbserial-1420`.
 - [x] Micro-USB data cable arrived and Nano detected successfully.
 - [ ] Flash and pass `TestHeartbeat`.
-- [ ] Flash and pass `TestMotor`; confirm direction, roughly ±90° travel, smooth
-  sound, no lost steps, and safe temperatures. Do this only with the motor and
-  base secured, the arm's full sweep clear, and Vref already set.
+- [x] Flash and pass a guarded `TestMotor` motion check from the interim Uno at
+  1/32 microstepping and 0.91 V Vref. The motor turned under 12 V and was
+  stopped with the motor-power switch. A longer mounted thermal/roughly ±90°
+  acceptance run remains part of the electrical gate below.
 - [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
 - [x] Compile all firmware sketches so missing libraries or toolchain problems
   are solved before the magnet arrives. `TestMotor` compiled and flashed
@@ -136,13 +146,19 @@ Rig record:
 - Rig name: `________________`
 - Arduino Nano port: `/dev/cu.usbserial-1420`
 - Arduino Uno port (interim): `/dev/cu.usbmodem14701`
-- Driver: TMC2209 V985 (defective — replacement needed)
+- Driver: TMC2209 V985 (survived the brief reverse-polarity connections;
+  unpowered VS-to-GND reads open and guarded `TestMotor` motion passed)
 - Motor: 42BL233.0-21A, 6-pin unipolar, coils on pins 1+4 and 3+6
 - Microsteps: 1/32 (MS1=HIGH, MS2=LOW)
-- Vref/current setting: measured 0.08 V (factory); target 0.9 V; trimpot
-  could not be adjusted (stiff or damaged)
-- 12 V supply: KDT-1230, 12 V 3 A; barrel jack cut, black=+12 V, white=GND
+- Vref/current setting: **0.91 V** (target about 0.9 V / 0.64 A RMS). The
+  trimpot was not damaged: it had been resting against its clockwise end stop,
+  which is the minimum-Vref end on this carrier; anticlockwise raises Vref.
+- 12 V supply: KDT-1230, 12 V 3 A; barrel jack cut; **meter-confirmed
+  white=+12 V, black=GND**. This intentional, nonstandard colour assignment is
+  the reverse of the original incorrect project note.
 - AS5600 air gap and mounting notes: `________________`
+- AS5600 status: board and magnet are not yet in the circuit; `TestEncoder`,
+  sysid and any policy deployment remain blocked until they are installed.
 
 Electrical gate:
 
@@ -321,7 +337,11 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-10-21 | Nano bring-up | Nano powers on; Mac sees no USB device | Cable is charging-only | Data/sync cable ordered; defer flashing and serial tests |
 | 2026-10-22 | Nano cable test | Micro-USB data cable arrived | Nano detected at `/dev/cu.usbserial-1420` | Nano cable blocker resolved |
 | 2026-10-22 | Motor ID | Motor label 42BL233.0-21A, 6-pin connector | Confirmed stepper by detent; coils: pins 1+4, 3+6; centre taps 2+5 | Wire bipolar (skip pins 2, 5) |
-| 2026-10-22 | Motor test (Uno) | Uno as stand-in; TestMotor compiled and flashed; TMC2209 wired via breadboard; 12 V supply barrel jack cut and polarity verified | TMC2209 VS shorts to GND under voltage; 12 V adapter trips overcurrent; Vref stuck at 0.08 V | TMC2209 board (V985) defective — order replacement; consider DRV8825 as interim alternative |
+| 2026-10-22 | Motor test (Uno) — superseded diagnosis | Uno as stand-in; TestMotor compiled and flashed; TMC2209 wired via breadboard; cut 12 V lead was mistakenly recorded as black=+12 V and white=GND | Adapter entered overcurrent protection when TMC ground completed the circuit; this was initially misdiagnosed as an internal VS-to-GND short | **Original diagnosis invalid:** the supply polarity was reversed at the driver because the recorded wire colours were wrong |
+| 2026-10-23 | 12 V polarity correction | Re-measured the isolated cut lead with red probe on white and black probe on black | Meter reads approximately +12 V: **white=+12 V, black=GND** | The reversed-looking colour assignment is intentional on this cable; do not power the TMC again until an unpowered VS-to-GND check establishes whether it survived the reverse-polarity connections |
+| 2026-10-26 | TMC2209 recovery + current limit | Motor disconnected; 22 µF/25 V electrolytic and `104` ceramic fitted across VM/GND; Uno provides 5 V/VIO; corrected 12 V polarity | VS-to-GND reads open unpowered; VIO measures 5 V and VM measures 12 V; TMC accepts both rails without the adapter tripping; Vref adjusts normally and is set to **0.91 V** | Driver survived. The trimpot's clockwise stop is minimum Vref; turn anticlockwise to raise it |
+| 2026-10-26 | USB overcurrent investigation | Uno connected to Mac at `/dev/cu.usbmodem14701`; TMC powered at 5 V + 12 V; motor disconnected; Vref probing in progress | macOS logged a real overcurrent on the Uno's physical USB port (`0x14700000`) at 09:59:51, disconnected the Uno, then re-enumerated it five seconds later. With probes removed, the untouched circuit subsequently ran both rails for about 90 seconds with no recurrence | A momentary probe/jumper bridge is the leading explanation, but is not proven. Avoid thick live probes near adjacent pads; power down before repositioning test leads. Use an inline USB power meter or a non-Mac USB supply for further current diagnosis if the warning recurs |
+| 2026-10-26 | Guarded motor test (Uno) | `TestMotor`; TMC2209; 1/32 microstepping (`MS1=HIGH`, `MS2=LOW`); Vref 0.91 V; motor coils pins 1+4 and 3+6, centre taps 2+5 omitted | Motor turns under command; 12 V switch stops it correctly | Actuator chain is functional. Next hardware blocker is the unwired AS5600 + missing diametric magnet; pass `TestEncoder` before sysid or policy deployment |
 
 ## Definition of done
 
