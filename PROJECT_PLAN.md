@@ -22,6 +22,13 @@ The build guides and the canonical RL pipeline remain the source of truth.
   at `/dev/cu.usbserial-1420`).
 - [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
   fine-tuning and standalone deployment are blocked until it arrives.
+- [ ] **AS5600 encoder board may be damaged** from the earlier reversed-polarity
+  incident. Order a replacement AS5600 board as a precaution; test the
+  existing one first when the magnet arrives.
+- [ ] **Pendulum CAD needs a through-hole for magnet removal.** The current
+  design traps the magnet once inserted. Modify the CAD to add a small
+  through-hole so the magnet can be pushed out if needed (e.g. for
+  replacement or repositioning).
 - [x] **TMC2209 survived and passes the guarded motor test.** The earlier
   VS-to-GND "short" diagnosis was caused by reversed 12 V polarity, not an
   internal driver short. After correcting the polarity, VS-to-GND measured
@@ -342,6 +349,7 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-10-26 | TMC2209 recovery + current limit | Motor disconnected; 22 µF/25 V electrolytic and `104` ceramic fitted across VM/GND; Uno provides 5 V/VIO; corrected 12 V polarity | VS-to-GND reads open unpowered; VIO measures 5 V and VM measures 12 V; TMC accepts both rails without the adapter tripping; Vref adjusts normally and is set to **0.91 V** | Driver survived. The trimpot's clockwise stop is minimum Vref; turn anticlockwise to raise it |
 | 2026-10-26 | USB overcurrent investigation | Uno connected to Mac at `/dev/cu.usbmodem14701`; TMC powered at 5 V + 12 V; motor disconnected; Vref probing in progress | macOS logged a real overcurrent on the Uno's physical USB port (`0x14700000`) at 09:59:51, disconnected the Uno, then re-enumerated it five seconds later. With probes removed, the untouched circuit subsequently ran both rails for about 90 seconds with no recurrence | A momentary probe/jumper bridge is the leading explanation, but is not proven. Avoid thick live probes near adjacent pads; power down before repositioning test leads. Use an inline USB power meter or a non-Mac USB supply for further current diagnosis if the warning recurs |
 | 2026-10-26 | Guarded motor test (Uno) | `TestMotor`; TMC2209; 1/32 microstepping (`MS1=HIGH`, `MS2=LOW`); Vref 0.91 V; motor coils pins 1+4 and 3+6, centre taps 2+5 omitted | Motor turns under command; 12 V switch stops it correctly | Actuator chain is functional. Next hardware blocker is the unwired AS5600 + missing diametric magnet; pass `TestEncoder` before sysid or policy deployment |
+| 2026-10-29 | Review | — | AS5600 board may have been damaged during reversed-polarity incident; pendulum CAD lacks a through-hole for magnet removal | Order replacement AS5600 as precaution; modify pendulum CAD to add magnet push-out hole |
 
 ## Definition of done
 
