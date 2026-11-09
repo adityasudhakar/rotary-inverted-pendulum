@@ -16,15 +16,19 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] Initial parts have arrived and were photographed for inventory.
 - [x] Repository is available locally.
 - [x] Reference firmware and Ferrolho's trained policy headers are present.
-- [x] Missing AS5600 diametric magnet identified and reordered.
+- [x] Missing AS5600 magnet identified; multiple magnets have now been tested.
 - [x] USB power-only cable identified; Micro-USB data/sync cable ordered.
 - [x] Micro-USB data/sync cable arrived and confirmed working (Nano detected
   at `/dev/cu.usbserial-1420`).
-- [ ] **Waiting on the AS5600 magnet.** Encoder testing, sysid, real-rig
-  fine-tuning and standalone deployment are blocked until it arrives.
-- [ ] **AS5600 encoder board may be damaged** from the earlier reversed-polarity
-  incident. Order a replacement AS5600 board as a precaution; test the
-  existing one first when the magnet arrives.
+- [ ] **AS5600 sensing is not functionally reliable.** Multiple magnets and two
+  encoder boards have been tested. Some fixed positions produce strong, stable
+  readings, but small alignment changes cause large strength changes and a
+  controlled 180-degree pendulum rotation was not reconciled reliably with the
+  captured readout. Do not proceed to sysid, training or balance control until
+  the encoder passes the acceptance test below.
+- [x] Replacement AS5600 board obtained and A/B tested. It behaves similarly to
+  the original board, making a single damaged encoder board an unlikely full
+  explanation. The root cause remains unresolved.
 - [ ] **Pendulum CAD needs a through-hole for magnet removal.** The current
   design traps the magnet once inserted. Modify the CAD to add a small
   through-hole so the magnet can be pushed out if needed (e.g. for
@@ -84,8 +88,8 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [ ] Photograph the parts and wiring labels before assembly.
 - [ ] Mount the NEMA17 motor and motor plate.
 - [ ] Finish the mechanical assembly except for permanent AS5600 alignment.
-- [ ] Mount the AS5600 loosely; do not glue or permanently position it until the
-  replacement diametric magnet can be used to set the air gap.
+- [ ] Mount the AS5600 loosely; do not glue or permanently position it until a
+  complete-revolution test establishes a repeatable air gap and centering.
 - [ ] Fit the arm to the motor shaft and establish a repeatable mechanical zero.
 - [ ] Fit the pendulum bearing/shaft with minimal play and friction.
 - [ ] Route the encoder wires so they remain slack throughout arm travel.
@@ -111,10 +115,11 @@ Mechanical gate:
 
 ## Phase 2 — electronics and first power-on
 
-Work that can be completed while waiting for the magnet:
+Electronics bring-up:
 
-- [ ] Wire the Nano, driver, motor, AS5600, power switch, barrel jack, and
-  decoupling capacitors exactly as documented.
+- [ ] Transfer the proven interim Uno wiring to the final Nano/protoboard after
+  the encoder problem is resolved. Driver, motor, power and AS5600 have been
+  exercised from the Uno, but the final electronics assembly is not complete.
 - [ ] Leave the AS5600 mechanically adjustable even after wiring it.
 - [ ] Verify supply polarity with a meter immediately before connection, then
   verify driver orientation, common ground, motor coil pairs,
@@ -135,14 +140,14 @@ Work that can be completed while waiting for the magnet:
   acceptance run remains part of the electrical gate below.
 - [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
 - [x] Compile all firmware sketches so missing libraries or toolchain problems
-  are solved before the magnet arrives. `TestMotor` compiled and flashed
+  are solved before final assembly. `TestMotor` compiled and flashed
   successfully to an Arduino Uno (used as stand-in; same ATmega328P).
   AccelStepper and FastAccelStepper libraries confirmed installed.
 
-Work that waits for the magnet:
+Encoder work:
 
-- [ ] Flash and pass `TestEncoder`; adjust the magnet for stable readings over a
-  complete revolution before fixing it permanently.
+- [ ] Pass `TestEncoder`; tested configurations have not yet reported angle
+  correctly over a controlled rotation even when magnet strength is healthy.
 - [ ] Permanently secure the AS5600 and magnet only after the strength and
   full-rotation tests pass.
 - [ ] Boot-check `LowLevelServer` and `RLControl`; both intentionally wait for
@@ -163,9 +168,74 @@ Rig record:
 - 12 V supply: KDT-1230, 12 V 3 A; barrel jack cut; **meter-confirmed
   white=+12 V, black=GND**. This intentional, nonstandard colour assignment is
   the reverse of the original incorrect project note.
-- AS5600 air gap and mounting notes: `________________`
-- AS5600 status: board and magnet are not yet in the circuit; `TestEncoder`,
-  sysid and any policy deployment remain blocked until they are installed.
+- AS5600 air gap and mounting notes: tested on the chip side at several gaps
+  and X/Y offsets. Detection is highly sensitive to centering and gap; no
+  repeatable accepted geometry has been established. Header pins were removed
+  and reoriented to clear the chip side, and the magnet was moved closer in the
+  printed pendulum holder.
+- AS5600 status: original and replacement HW-993/AS5600 boards and multiple
+  magnets have been tried on the Uno. Static readings can be strong and stable,
+  but angle tracking through real pendulum motion is not yet usable.
+
+### AS5600 troubleshooting record (through 2026-11-09)
+
+The encoder is the current hardware blocker. The tests below supersede the
+earlier assumptions that the magnet was merely missing or that the original
+board alone had been damaged.
+
+- Wiring used for the tests: AS5600 at I2C address `0x36`, VCC/GND connected to
+  the Uno, SDA=A4, SCL=A5, DIR tied to GND, and OUT/GPO unused. The old encoder
+  was disconnected during replacement-board tests, so there was no duplicate
+  I2C address. The replacement board's headers were soldered.
+- Both the original and replacement encoder boards communicate successfully.
+  Several magnets/configurations were tried, including moving the installed
+  magnet closer to the chip and testing it by hand outside the holder.
+- Sensing through the back of the PCB was weak (roughly 720-1213 magnitude), so
+  testing moved to the chip side. On the chip side, small changes in X/Y
+  centering or gap could change magnitude from almost zero/no detection to
+  roughly 2450/healthy detection. This sensitivity persisted in a fixture with
+  no nearby metal jaws, so metal interference was considered but not proven as
+  the primary cause.
+- Some fixed alignments were excellent: repeated samples held near magnitude
+  2086-2088, and a replacement-board configuration held near 2020-2025 with
+  raw angle 455. Another static run held magnitude 1937-1944 and raw angle 407.
+  Other fixed positions were repeatably weak, including magnitudes around
+  245-249, 679-682 and 1380-1385. This shows that the I2C link can be stable,
+  but it does not establish correct angular sensing.
+- One fixtured test retained healthy detection throughout (magnitude roughly
+  1828-2143) while the pendulum was physically rotated 180 degrees. The live
+  analysis initially identified only about 106 counts (9.3 degrees) between
+  selected samples, but the operator confirmed the physical motion was 180
+  degrees and challenged that interpretation. Because the capture window or
+  sample selection may have been wrong, this is an unresolved mismatch, not a
+  trustworthy measurement. A correct endpoint test should show about 2048 of
+  4096 counts. Earlier hand-held tests that swept large raw-angle ranges were
+  also confounded by changing gap and lateral alignment.
+- Static fixture settling also shifted one plateau from raw 455/magnitude 2025
+  to raw 407/magnitude 1938 (about 48 counts or 4.2 degrees) without an intended
+  rotation. Loose wiring alone is not a sufficient explanation because long
+  static runs were otherwise rock solid, but mechanical alignment/relative
+  motion remains a possible contributor.
+- Current conclusion: the system can produce valid-looking AS5600 readings,
+  but the output is too alignment-sensitive and inconsistent with known motion
+  to support feedback control. No conclusion about a single bad board or a
+  specific magnetization fault has yet been proven.
+
+Encoder acceptance gate before sysid or policy work:
+
+- [ ] With board and magnet axes rigidly fixed, magnet detection remains healthy
+  over the pendulum's complete revolution (detected, neither weak nor strong).
+- [ ] A controlled 180-degree rotation changes raw angle by approximately 2048
+  counts, and a full revolution smoothly traverses/wraps the 0-4095 range.
+- [ ] Multiple forward/reverse sweeps are repeatable, without dropouts, large
+  discontinuities or dependence on tiny unavoidable mounting shifts.
+- [ ] Repeat the 180-degree endpoint test using the freshly uploaded minimal
+  direct-register diagnostic sketch. Its clean baseline was raw 425-426,
+  37.35-37.44 degrees, magnitude 2049-2052 with valid I2C reads; the controlled
+  180-degree endpoint has not yet been captured with this sketch.
+- [ ] If the direct-register result still fails, isolate magnetization and
+  mechanics with a rigid off-pendulum rotation jig. Consider a shaft-mounted
+  optical quadrature encoder if the magnetic arrangement cannot pass this gate.
 
 Electrical gate:
 
@@ -175,10 +245,12 @@ Electrical gate:
 
 ## Phase 3 — identify this rig
 
-- [ ] Set up the Python environment from `policy/` with `uv` while waiting for
-  the magnet.
-- [ ] Run software-only smoke tests and prepare the sysid command while waiting.
-- [ ] **Magnet dependency:** do not start real sysid until `TestEncoder` passes.
+- [ ] Set up the Python environment from `policy/` with `uv` while resolving the
+  encoder blocker.
+- [ ] Run software-only smoke tests and prepare the sysid command while encoder
+  troubleshooting continues.
+- [ ] **Encoder dependency:** do not start real sysid until the AS5600 passes the
+  full acceptance gate above (or is replaced by a validated encoder design).
 - [ ] Flash `firmware/LowLevelServer` using the selected microstep setting.
 - [ ] Run the guided system-identification workflow:
 
@@ -350,6 +422,10 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-10-26 | USB overcurrent investigation | Uno connected to Mac at `/dev/cu.usbmodem14701`; TMC powered at 5 V + 12 V; motor disconnected; Vref probing in progress | macOS logged a real overcurrent on the Uno's physical USB port (`0x14700000`) at 09:59:51, disconnected the Uno, then re-enumerated it five seconds later. With probes removed, the untouched circuit subsequently ran both rails for about 90 seconds with no recurrence | A momentary probe/jumper bridge is the leading explanation, but is not proven. Avoid thick live probes near adjacent pads; power down before repositioning test leads. Use an inline USB power meter or a non-Mac USB supply for further current diagnosis if the warning recurs |
 | 2026-10-26 | Guarded motor test (Uno) | `TestMotor`; TMC2209; 1/32 microstepping (`MS1=HIGH`, `MS2=LOW`); Vref 0.91 V; motor coils pins 1+4 and 3+6, centre taps 2+5 omitted | Motor turns under command; 12 V switch stops it correctly | Actuator chain is functional. Next hardware blocker is the unwired AS5600 + missing diametric magnet; pass `TestEncoder` before sysid or policy deployment |
 | 2026-10-29 | Review | — | AS5600 board may have been damaged during reversed-polarity incident; pendulum CAD lacks a through-hole for magnet removal | Order replacement AS5600 as precaution; modify pendulum CAD to add magnet push-out hole |
+| 2026-10-29 to 2026-11-05 | AS5600 alignment experiments | Original board; several magnet placements; hand-held and fixtured tests; chip-side and PCB-back tests | Chip-side magnitude ranged from no detection to about 2450 depending on gap/centering; PCB-back sensing was weak. Some static positions were very stable, but motion tests were inconsistent | Reorient headers for chip-side clearance, move magnet closer, remove nearby metal from the fixture, and A/B test replacement hardware |
+| 2026-11-05 | Replacement magnet test | Original AS5600 with new/repositioned magnet and non-metallic clearance around the sensing area | Strong detection could be obtained, but reliable angle tracking was not established | A different magnet alone did not resolve the issue; test a replacement encoder board |
+| 2026-11-09 | Replacement encoder A/B test | New soldered AS5600 board on Uno; old board disconnected; magnet fixtured above chip | Static output could hold raw 455 and magnitude 2020-2025, then raw 407 and magnitude 1937-1944. During a known 180-degree pendulum rotation, the live analysis selected samples only about 106 counts apart despite healthy magnitude; the operator correctly challenged this result, so the capture/interpretation is inconclusive | Two boards and multiple magnets/configurations have not yet produced a trustworthy functional-motion pass. Block sysid/policy work and run a controlled minimal direct-register endpoint test |
+| 2026-11-09 | Minimal direct-register baseline | Fresh Uno sketch reading AS5600 raw angle/status/magnitude directly at `0x36`, 100 kHz I2C, 50 ms samples; motor disabled | Clean static baseline: raw 425-426, 37.35-37.44 degrees, magnitude 2049-2052, valid healthy detection | Capture controlled 180-degree endpoint next; baseline alone is not a pass |
 
 ## Definition of done
 
