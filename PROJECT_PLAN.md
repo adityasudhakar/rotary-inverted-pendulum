@@ -29,10 +29,32 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] Replacement AS5600 board obtained and A/B tested. It behaves similarly to
   the original board, making a single damaged encoder board an unlikely full
   explanation. The root cause remains unresolved.
-- [ ] **Pendulum CAD needs a through-hole for magnet removal.** The current
-  design traps the magnet once inserted. Modify the CAD to add a small
-  through-hole so the magnet can be pushed out if needed (e.g. for
-  replacement or repositioning).
+- [x] **AS5600 supply moved from 5 V to 3.3 V (2026-11-09).** All earlier
+  encoder tests ran the module from the Uno's 5 V pin. A product review for
+  this module family warns that the boards ship wired for 3.3 V and that R1
+  must be open for safe 5 V use (the same open TODO as issue #4 in
+  `website/src/content/docs/build/electronics.md`). R1's state on our boards
+  was **not** verified (no continuity check done yet). At 3.3 V the chip
+  reports the field as too weak (AGC pinned at its maximum, "too weak" flag)
+  almost continuously. The earlier 5 V "healthy magnitude ~2070" readings are
+  now treated as unreliable: magnitude is AGC-regulated, not a strength gauge.
+- [ ] **Replacement diametric magnets ordered; awaiting arrival.** K&J
+  Magnetics D42DIA-type discs, 1/4" x 1/8" (6.35 x 3.18 mm), diametrically
+  magnetised (N42 and/or N52 grade; confirm what arrives). Verify on arrival
+  that the field is really diametric (strongest centred over the chip, raw
+  angle sweeps 0-4095 when spun in place) before trusting the listing.
+- [ ] **Pendulum CAD: widen the magnet pocket and add a magnet push-out hole.**
+  Measured from the real `pendulum.stl` (the copy in a fresh clone is a Git
+  LFS pointer; the real file must be pulled): the shaft is 8.1 mm OD with a
+  magnet pocket of only about 4.1 mm diameter x ~1.5 mm deep at the free end,
+  so the 6.35 x 3.18 mm replacement discs do not fit. A 2.5 mm axial bore
+  already runs most of the shaft, closed by a ~0.5 mm wall behind the pocket
+  and a ~1 mm cap at the far hub face. Proposed change: pocket about
+  6.45-6.5 mm diameter x ~3.3 mm deep (about 0.8 mm wall remains, and the
+  deeper pocket breaks into the bore), plus a 2.5 mm hole through the far
+  cap so a ~2 mm rod can push the magnet out. Edit in Onshape, then re-export
+  the STL/URDF and re-run sysid (the replacement magnet is about 3 g against a
+  pendulum under 50 g).
 - [x] **TMC2209 survived and passes the guarded motor test.** The earlier
   VS-to-GND "short" diagnosis was caused by reversed 12 V polarity, not an
   internal driver short. After correcting the polarity, VS-to-GND measured
@@ -176,6 +198,9 @@ Rig record:
 - AS5600 status: original and replacement HW-993/AS5600 boards and multiple
   magnets have been tried on the Uno. Static readings can be strong and stable,
   but angle tracking through real pendulum motion is not yet usable.
+- AS5600 supply: **3.3 V from the Uno's 3V3 pin** (since 2026-11-09; was 5 V).
+  The Uno's internal I2C pull-ups were disabled in the diagnostic sketch so
+  SDA/SCL are pulled up only by the module to 3.3 V. R1 state unverified.
 
 ### AS5600 troubleshooting record (through 2026-11-09)
 
@@ -221,6 +246,50 @@ board alone had been damaged.
   to support feedback control. No conclusion about a single bad board or a
   specific magnetization fault has yet been proven.
 
+#### 2026-11-09 independent re-test (Uno, motor driver disabled)
+
+An ad-hoc direct-register logger (reads raw angle, magnitude, AGC and status at
+`0x36`; kept outside the repo) was flashed to the Uno so the earlier library and
+sketch results could be checked independently. Findings:
+
+- **Magnitude is not a strength gauge; AGC is.** Magnitude stays near ~2100
+  whenever the chip has enough signal, because the AGC regulates it (hand-held
+  close to the chip: AGC 32-40 with magnitude ~2100; in the rig: AGC pinned at
+  255 with magnitude ~2070). The 5 V rig readings therefore sat at the
+  weakest-field limit, and the earlier "healthy magnitude" labels in this
+  record are superseded. Aim for AGC roughly mid-range (about 128 at 5 V; the
+  range is 0-128 at 3.3 V, so roughly 40-90 there) with only the
+  magnet-detected flag set.
+- **5 V static baseline:** raw 424-425, magnitude 2067-2073, AGC 255, status
+  `0x67`, 338 samples, 0 I2C errors. The status byte has bits set outside the
+  datasheet's bits 5:3 and registers 0x10-0x19 read non-zero; config registers
+  0x00-0x0A are all zero. This may indicate a clone or stressed part; not proven.
+- **5 V guided rotation test** (audio-cued, assuming the cued motion was
+  performed): raw-angle range over a 180-degree turn was only 5.1 degrees, over
+  the return turn 7.5 degrees, and over one full slow revolution 11.7 degrees,
+  while magnitude (1811-2147) and AGC (207-255) wobbled. Something moved, but
+  the angle did not follow. A correct result is about 180 degrees and 360 degrees.
+- **Hand-spinning the magnet** (two attempts) was inconclusive: it was in range
+  only ~2 s in the first and never in the second. The apparent full 0-4095
+  sweeps occurred while magnitude was 2-7 (no magnet in range), i.e. noise.
+- **3.3 V test:** AS5600 VCC moved to the Uno 3V3 pin, internal pull-ups off.
+  I2C works with 0 errors. AGC sits at its 3.3 V maximum (128) with the
+  "too weak" flag set; raw angle wanders widely (e.g. 1054-3527 in an 8 s
+  nominally static capture) and magnitude is 241-1710. A 60 s audio gap-meter
+  run (spoken weak/good/strong + AGC) reported "weak" for most of the run
+  (about 85% of readings), with only two brief "good" readings (once at AGC 59).
+- **Interpretation (hypotheses, not confirmed):** (1) the included magnet is
+  too small/weak for the gap and/or not diametric; an axial magnet gives a weak
+  differential signal when centred and an angle that follows lateral position
+  rather than rotation, which matches the alignment sensitivity seen; (2)
+  running a 3.3 V-wired module at 5 V with R1 closed may have inflated the 5 V
+  readings and could have stressed the chip. A closed-R1 continuity check
+  (power off) has not been done. Both boards come from the same listing, which
+  would explain why swapping boards and magnets changed nothing.
+- **Pendulum geometry** (from the real `pendulum.stl`; see Current state): the
+  existing magnet pocket is about 4.1 mm x ~1.5 mm, consistent with a small
+  ~4 mm disc and a weak field at the chip.
+
 Encoder acceptance gate before sysid or policy work:
 
 - [ ] With board and magnet axes rigidly fixed, magnet detection remains healthy
@@ -233,6 +302,15 @@ Encoder acceptance gate before sysid or policy work:
   direct-register diagnostic sketch. Its clean baseline was raw 425-426,
   37.35-37.44 degrees, magnitude 2049-2052 with valid I2C reads; the controlled
   180-degree endpoint has not yet been captured with this sketch.
+- [ ] Power-off continuity check across R1 on each AS5600 board; remove R1 only
+  if the module must run from 5 V (the final Nano build), otherwise keep it on
+  3.3 V.
+- [ ] When the replacement diametric magnets arrive: confirm they are diametric
+  (best signal centred over the chip, raw angle sweeps 0-4095 as the magnet is
+  spun in place), find a gap with AGC mid-range and no weak/strong flags using
+  an audio gap meter, then repeat the 180-degree and full-revolution tests.
+- [ ] Apply the pendulum CAD change (wider/deeper pocket plus push-out hole) so
+  the new magnets fit and are retrievable.
 - [ ] If the direct-register result still fails, isolate magnetization and
   mechanics with a rigid off-pendulum rotation jig. Consider a shaft-mounted
   optical quadrature encoder if the magnetic arrangement cannot pass this gate.
@@ -426,6 +504,10 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-05 | Replacement magnet test | Original AS5600 with new/repositioned magnet and non-metallic clearance around the sensing area | Strong detection could be obtained, but reliable angle tracking was not established | A different magnet alone did not resolve the issue; test a replacement encoder board |
 | 2026-11-09 | Replacement encoder A/B test | New soldered AS5600 board on Uno; old board disconnected; magnet fixtured above chip | Static output could hold raw 455 and magnitude 2020-2025, then raw 407 and magnitude 1937-1944. During a known 180-degree pendulum rotation, the live analysis selected samples only about 106 counts apart despite healthy magnitude; the operator correctly challenged this result, so the capture/interpretation is inconclusive | Two boards and multiple magnets/configurations have not yet produced a trustworthy functional-motion pass. Block sysid/policy work and run a controlled minimal direct-register endpoint test |
 | 2026-11-09 | Minimal direct-register baseline | Fresh Uno sketch reading AS5600 raw angle/status/magnitude directly at `0x36`, 100 kHz I2C, 50 ms samples; motor disabled | Clean static baseline: raw 425-426, 37.35-37.44 degrees, magnitude 2049-2052, valid healthy detection | Capture controlled 180-degree endpoint next; baseline alone is not a pass |
+| 2026-11-09 | Direct-register guided rotation (5 V) | Own register-level logger on the Uno; AS5600 on 5 V; audio-cued 180-degree, return and full-revolution turns | Raw angle moved only 5.1 / 7.5 / 11.7 degrees over the three motions while magnitude and AGC wobbled; AGC pinned at 255 at rest | Encoder still not tracking rotation. Magnitude is AGC-regulated and was a misleading "health" metric; use AGC |
+| 2026-11-09 | Hand-spin magnet tests (5 V) | Magnet held and spun by hand over the chip, two attempts | Mostly out of range; only ~35 healthy samples, angle moved ~20 degrees; apparent full sweeps were noise at magnitude 2-7 | Inconclusive; stop relying on hand tests |
+| 2026-11-09 | AS5600 supply change to 3.3 V | VCC moved from Uno 5V to 3V3; Uno internal I2C pull-ups disabled; same fixture; audio gap meter for 60 s | I2C fine; AGC pinned at 128 (maximum), "too weak" flag most of the time (about 85% of readings), raw angle wandering | The true field at this magnet/gap is too weak; 5 V readings were likely misleading (R1 closed? unverified). Stay on 3.3 V |
+| 2026-11-09 | Pendulum geometry / magnet fit | Real `pendulum.stl` pulled from LFS and sliced; K&J D42DIA 6.35 x 3.18 mm diametric discs ordered | Existing pocket ~4.1 x ~1.5 mm; new discs do not fit; 2.5 mm bore nearly through the shaft | Widen/deepen pocket and open the bore end in Onshape; re-run sysid after the swap; test new magnets for true diametric behaviour on arrival |
 
 ## Definition of done
 
