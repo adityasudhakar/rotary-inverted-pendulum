@@ -20,30 +20,27 @@ The build guides and the canonical RL pipeline remain the source of truth.
 - [x] USB power-only cable identified; Micro-USB data/sync cable ordered.
 - [x] Micro-USB data/sync cable arrived and confirmed working (Nano detected
   at `/dev/cu.usbserial-1420`).
-- [ ] **AS5600 sensing is not functionally reliable.** Multiple magnets and two
-  encoder boards have been tested. Some fixed positions produce strong, stable
-  readings, but small alignment changes cause large strength changes and a
-  controlled 180-degree pendulum rotation was not reconciled reliably with the
-  captured readout. Do not proceed to sysid, training or balance control until
-  the encoder passes the acceptance test below.
-- [x] Replacement AS5600 board obtained and A/B tested. It behaves similarly to
-  the original board, making a single damaged encoder board an unlikely full
-  explanation. The root cause remains unresolved.
-- [x] **AS5600 supply moved from 5 V to 3.3 V (2026-11-09).** All earlier
-  encoder tests ran the module from the Uno's 5 V pin. A product review for
-  this module family warns that the boards ship wired for 3.3 V and that R1
-  must be open for safe 5 V use (the same open TODO as issue #4 in
-  `website/src/content/docs/build/electronics.md`). R1's state on our boards
-  was **not** verified (no continuity check done yet). At 3.3 V the chip
-  reports the field as too weak (AGC pinned at its maximum, "too weak" flag)
-  almost continuously. The earlier 5 V "healthy magnitude ~2070" readings are
-  now treated as unreliable: magnitude is AGC-regulated, not a strength gauge.
-- [ ] **Replacement diametric magnets ordered; awaiting arrival.** K&J
-  Magnetics D42DIA-type discs, 1/4" x 1/8" (6.35 x 3.18 mm), diametrically
-  magnetised (N42 and/or N52 grade; confirm what arrives). Verify on arrival
-  that the field is really diametric (strongest centred over the chip, raw
-  angle sweeps 0-4095 when spun in place) before trusting the listing.
-- [ ] **Pendulum CAD: widen the magnet pocket and add a magnet push-out hole.**
+- [x] **AS5600 functional sensing passed with a separately purchased
+  diametrically magnetised disc (2026-11-16).** The supplied disc was axial,
+  not diametric, and was the root cause of the misleading alignment-sensitive
+  results. The replacement disc produces the expected smooth angle change when
+  rotated face-on over the chip. It has now been inserted into the pendulum,
+  the encoder has been installed in the arm/housing, and the assembled geometry
+  continues to track rotation.
+- [x] Replacement AS5600 board obtained and A/B tested. It behaved similarly to
+  the original because both were being tested with axial magnets; neither board
+  was shown to be the root cause.
+- [x] **AS5600 supply moved from 5 V to 3.3 V (2026-11-09).** R1's state on
+  these HW-993 boards remains unverified, so keep using the Uno's 3V3 pin unless
+  the module is checked and deliberately configured for 5 V. The earlier 3.3 V
+  "too weak" result was obtained with the axial magnet and is superseded by the
+  successful diametric-magnet test. Magnitude is AGC-regulated and must not be
+  treated as a standalone field-strength measurement.
+- [x] **Separately purchased diametric magnet received and verified.** It
+  produces strong centred detection and a smooth `0-4095` sweep when spun
+  face-on, as required by the AS5600 and the Ferrolho design.
+- [ ] **Pendulum CAD: consider widening the magnet pocket and adding a magnet
+  push-out hole if the current installed fit needs revision.**
   Measured from the real `pendulum.stl` (the copy in a fresh clone is a Git
   LFS pointer; the real file must be pulled): the shaft is 8.1 mm OD with a
   magnet pocket of only about 4.1 mm diameter x ~1.5 mm deep at the free end,
@@ -54,7 +51,9 @@ The build guides and the canonical RL pipeline remain the source of truth.
   deeper pocket breaks into the bore), plus a 2.5 mm hole through the far
   cap so a ~2 mm rod can push the magnet out. Edit in Onshape, then re-export
   the STL/URDF and re-run sysid (the replacement magnet is about 3 g against a
-  pendulum under 50 g).
+  pendulum under 50 g). As of 2026-11-16, a working diametric magnet has been
+  inserted successfully, so this modification is no longer an encoder bring-up
+  blocker.
 - [x] **TMC2209 survived and passes the guarded motor test.** The earlier
   VS-to-GND "short" diagnosis was caused by reversed 12 V polarity, not an
   internal driver short. After correcting the polarity, VS-to-GND measured
@@ -109,9 +108,10 @@ The build guides and the canonical RL pipeline remain the source of truth.
   MS1/MS2 wiring and every firmware `MICROSTEPS` value agree.
 - [ ] Photograph the parts and wiring labels before assembly.
 - [ ] Mount the NEMA17 motor and motor plate.
-- [ ] Finish the mechanical assembly except for permanent AS5600 alignment.
-- [ ] Mount the AS5600 loosely; do not glue or permanently position it until a
-  complete-revolution test establishes a repeatable air gap and centering.
+- [ ] Finish the mechanical assembly and inspect retention/alignment of the
+  installed AS5600 and diametric magnet.
+- [x] Insert the diametric magnet into the pendulum and mount the AS5600 in the
+  arm/housing. The installed pair continues to report rotation correctly.
 - [ ] Fit the arm to the motor shaft and establish a repeatable mechanical zero.
 - [ ] Fit the pendulum bearing/shaft with minimal play and friction.
 - [ ] Route the encoder wires so they remain slack throughout arm travel.
@@ -139,9 +139,9 @@ Mechanical gate:
 
 Electronics bring-up:
 
-- [ ] Transfer the proven interim Uno wiring to the final Nano/protoboard after
-  the encoder problem is resolved. Driver, motor, power and AS5600 have been
-  exercised from the Uno, but the final electronics assembly is not complete.
+- [ ] Transfer the proven interim Uno wiring to the final Nano/protoboard.
+  Driver, motor, power and the now-working AS5600 have been exercised from the
+  Uno, but the final electronics assembly is not complete.
 - [ ] Leave the AS5600 mechanically adjustable even after wiring it.
 - [ ] Verify supply polarity with a meter immediately before connection, then
   verify driver orientation, common ground, motor coil pairs,
@@ -168,10 +168,12 @@ Electronics bring-up:
 
 Encoder work:
 
-- [ ] Pass `TestEncoder`; tested configurations have not yet reported angle
-  correctly over a controlled rotation even when magnet strength is healthy.
-- [ ] Permanently secure the AS5600 and magnet only after the strength and
-  full-rotation tests pass.
+- [x] Pass the AS5600 functional rotation gate using the direct-register logger
+  and live angle/strength plot. The separately purchased diametric magnet tracks
+  rotation as expected both on the bench and after installation.
+- [x] Install the AS5600 and diametric magnet in the arm/housing and pendulum.
+  Final adhesive/retention and cable routing should still be inspected before
+  autonomous motion.
 - [ ] Boot-check `LowLevelServer` and `RLControl`; both intentionally wait for
   valid magnet detection during startup.
 
@@ -190,26 +192,28 @@ Rig record:
 - 12 V supply: KDT-1230, 12 V 3 A; barrel jack cut; **meter-confirmed
   white=+12 V, black=GND**. This intentional, nonstandard colour assignment is
   the reverse of the original incorrect project note.
-- AS5600 air gap and mounting notes: tested on the chip side at several gaps
-  and X/Y offsets. Detection is highly sensitive to centering and gap; no
-  repeatable accepted geometry has been established. Header pins were removed
-  and reoriented to clear the chip side, and the magnet was moved closer in the
-  printed pendulum holder.
-- AS5600 status: original and replacement HW-993/AS5600 boards and multiple
-  magnets have been tried on the Uno. Static readings can be strong and stable,
-  but angle tracking through real pendulum motion is not yet usable.
+- AS5600 air gap and mounting notes: earlier axial-magnet tests appeared highly
+  sensitive to centering and gap because the wrong field geometry was being
+  presented to the sensor. Header pins were removed and reoriented to clear the
+  chip side. With the diametric disc centred face-on, rotation now tracks as
+  expected; the magnet and board are installed in the pendulum and arm housing.
+- AS5600 status: original and replacement HW-993/AS5600 boards communicate.
+  The supplied magnet was proven axial. A separately purchased diametric disc
+  resolves the functional-motion problem and works after installation.
 - AS5600 supply: **3.3 V from the Uno's 3V3 pin** (since 2026-11-09; was 5 V).
   The Uno's internal I2C pull-ups were disabled in the diagnostic sketch so
   SDA/SCL are pulled up only by the module to 3.3 V. R1 state unverified.
 
-### AS5600 troubleshooting record (through 2026-11-09)
+### AS5600 troubleshooting record (through 2026-11-16)
 
-The encoder is the current hardware blocker. The tests below supersede the
-earlier assumptions that the magnet was merely missing or that the original
-board alone had been damaged.
+The encoder hardware blocker is resolved. The tests below preserve the path to
+the root cause and supersede the earlier assumptions that the original encoder
+board was damaged or that the supplied magnet merely needed closer alignment.
 
 - Wiring used for the tests: AS5600 at I2C address `0x36`, VCC/GND connected to
-  the Uno, SDA=A4, SCL=A5, DIR tied to GND, and OUT/GPO unused. The old encoder
+  the Uno, SDA=A4, SCL=A5, and OUT/GPO unused. DIR only selects the sign of the
+  reported rotation; it may be tied to GND for a defined direction or left
+  disconnected for these tests if its loose lead is insulated. The old encoder
   was disconnected during replacement-board tests, so there was no duplicate
   I2C address. The replacement board's headers were soldered.
 - Both the original and replacement encoder boards communicate successfully.
@@ -241,10 +245,10 @@ board alone had been damaged.
   rotation. Loose wiring alone is not a sufficient explanation because long
   static runs were otherwise rock solid, but mechanical alignment/relative
   motion remains a possible contributor.
-- Current conclusion: the system can produce valid-looking AS5600 readings,
-  but the output is too alignment-sensitive and inconsistent with known motion
-  to support feedback control. No conclusion about a single bad board or a
-  specific magnetization fault has yet been proven.
+- Conclusion at this stage (superseded on 2026-11-16): the system could produce
+  valid-looking AS5600 readings, but the output was too alignment-sensitive and
+  inconsistent with known motion to support feedback control. The later
+  controlled pole-orientation tests proved the magnetization fault.
 
 #### 2026-11-09 independent re-test (Uno, motor driver disabled)
 
@@ -290,30 +294,71 @@ sketch results could be checked independently. Findings:
   existing magnet pocket is about 4.1 mm x ~1.5 mm, consistent with a small
   ~4 mm disc and a weak field at the chip.
 
+#### 2026-11-16 root cause and successful diametric-magnet test
+
+The supplied disc magnet was **axially magnetised**: its north and south poles
+were on its two flat faces. That is the wrong geometry for the AS5600's normal
+on-axis rotary use. When held face-on and spun about its centre, an ideal axial
+disc presents a rotationally symmetric field, so the sensor has no useful
+changing direction to measure. Small offsets instead made the reported angle
+follow lateral position and tilt, explaining the earlier apparent extreme
+sensitivity to centering.
+
+The axial diagnosis was confirmed by holding the disc **edge-on** above the
+chip with one flat pole face against the tweezers, then flipping it so the
+opposite flat pole face was against the tweezers while keeping the disc
+edge-on. In that special orientation the field direction at the chip reverses,
+so both strong detection and an approximately 180-degree angle change are
+expected. This is a pole-identification test, not a usable pendulum mounting:
+
+![Supplied axial magnet held edge-on over the HW-993 sensor, first pole orientation](assets/encoder-tests/axial-magnet-edge-on-face-a.jpg)
+
+![Supplied axial magnet held edge-on after flipping to the opposite flat pole face](assets/encoder-tests/axial-magnet-edge-on-face-b.jpg)
+
+- Supplied magnet endpoint test: raw angle about `1060 -> 3108`, exactly `2048`
+  counts / 180 degrees.
+- Two other discs showed the same axial behaviour: about `1028 -> 3108` and
+  `3080 -> 1075`; their small endpoint errors are consistent with hand-held
+  placement. All of the previously tried discs were therefore axial.
+- In the useful edge-on moments, regulated magnitude was roughly `2040-2149`.
+  When the magnet was lost, magnitude collapsed to roughly `3-7` and the angle
+  became noise. Angle values captured in that state are invalid.
+
+A separately purchased **diametrically magnetised** disc (called "radial" in
+some purchase/conversation notes) was then tested in the geometry required by
+the AS5600: flat face toward the chip, axes centred, rotating about the disc's
+central axis. It produced the expected smooth angle sweep and stable detection,
+matching the Ferrolho repository's design assumptions. A live two-panel plot of
+angle in degrees and magnetic magnitude made the result directly visible.
+
+The working diametric magnet has now been inserted into the printed pendulum
+and the HW-993 encoder has been inserted into the arm/housing. Rotation still
+tracks correctly in the assembled geometry. The physical pendulum angle at
+which the encoder happens to report raw zero is not important: the upright
+reference must be established by software tare/offset calibration. Do not try
+to achieve raw zero by mechanically rotating the pressed-in magnet.
+
 Encoder acceptance gate before sysid or policy work:
 
-- [ ] With board and magnet axes rigidly fixed, magnet detection remains healthy
+- [x] With board and magnet axes rigidly fixed, magnet detection remains healthy
   over the pendulum's complete revolution (detected, neither weak nor strong).
-- [ ] A controlled 180-degree rotation changes raw angle by approximately 2048
+- [x] A controlled 180-degree rotation changes raw angle by approximately 2048
   counts, and a full revolution smoothly traverses/wraps the 0-4095 range.
-- [ ] Multiple forward/reverse sweeps are repeatable, without dropouts, large
+- [x] Multiple forward/reverse sweeps are repeatable, without dropouts, large
   discontinuities or dependence on tiny unavoidable mounting shifts.
-- [ ] Repeat the 180-degree endpoint test using the freshly uploaded minimal
-  direct-register diagnostic sketch. Its clean baseline was raw 425-426,
-  37.35-37.44 degrees, magnitude 2049-2052 with valid I2C reads; the controlled
-  180-degree endpoint has not yet been captured with this sketch.
+- [x] Repeat the endpoint/full-sweep test with the minimal direct-register
+  diagnostic stream and live angle/strength plot. The diametric disc passed.
 - [ ] Power-off continuity check across R1 on each AS5600 board; remove R1 only
   if the module must run from 5 V (the final Nano build), otherwise keep it on
   3.3 V.
-- [ ] When the replacement diametric magnets arrive: confirm they are diametric
-  (best signal centred over the chip, raw angle sweeps 0-4095 as the magnet is
-  spun in place), find a gap with AGC mid-range and no weak/strong flags using
-  an audio gap meter, then repeat the 180-degree and full-revolution tests.
-- [ ] Apply the pendulum CAD change (wider/deeper pocket plus push-out hole) so
-  the new magnets fit and are retrievable.
-- [ ] If the direct-register result still fails, isolate magnetization and
-  mechanics with a rigid off-pendulum rotation jig. Consider a shaft-mounted
-  optical quadrature encoder if the magnetic arrangement cannot pass this gate.
+- [x] Confirm the replacement magnet is diametric: centred face-on signal and a
+  smooth `0-4095` sweep when spun in place. Verify again after installation in
+  the real pendulum and arm housing.
+- [ ] Retain the proposed pendulum CAD push-out-hole improvement for easier
+  future magnet removal. A working diametric magnet currently fits and is
+  installed, so this is no longer a functional blocker.
+- [x] The direct-register result passed with the diametric magnet; the proposed
+  optical-encoder fallback is not currently needed.
 
 Electrical gate:
 
@@ -323,12 +368,11 @@ Electrical gate:
 
 ## Phase 3 — identify this rig
 
-- [ ] Set up the Python environment from `policy/` with `uv` while resolving the
-  encoder blocker.
-- [ ] Run software-only smoke tests and prepare the sysid command while encoder
-  troubleshooting continues.
-- [ ] **Encoder dependency:** do not start real sysid until the AS5600 passes the
-  full acceptance gate above (or is replaced by a validated encoder design).
+- [ ] Set up the Python environment from `policy/` with `uv`.
+- [ ] Run software-only smoke tests and prepare the sysid command now that the
+  encoder dependency is cleared.
+- [x] **Encoder dependency cleared:** the AS5600 and separately purchased
+  diametric magnet passed bench and installed functional-motion tests.
 - [ ] Flash `firmware/LowLevelServer` using the selected microstep setting.
 - [ ] Run the guided system-identification workflow:
 
@@ -508,6 +552,9 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-09 | Hand-spin magnet tests (5 V) | Magnet held and spun by hand over the chip, two attempts | Mostly out of range; only ~35 healthy samples, angle moved ~20 degrees; apparent full sweeps were noise at magnitude 2-7 | Inconclusive; stop relying on hand tests |
 | 2026-11-09 | AS5600 supply change to 3.3 V | VCC moved from Uno 5V to 3V3; Uno internal I2C pull-ups disabled; same fixture; audio gap meter for 60 s | I2C fine; AGC pinned at 128 (maximum), "too weak" flag most of the time (about 85% of readings), raw angle wandering | The true field at this magnet/gap is too weak; 5 V readings were likely misleading (R1 closed? unverified). Stay on 3.3 V |
 | 2026-11-09 | Pendulum geometry / magnet fit | Real `pendulum.stl` pulled from LFS and sliced; K&J D42DIA 6.35 x 3.18 mm diametric discs ordered | Existing pocket ~4.1 x ~1.5 mm; new discs do not fit; 2.5 mm bore nearly through the shaft | Widen/deepen pocket and open the bore end in Onshape; re-run sysid after the swap; test new magnets for true diametric behaviour on arrival |
+| 2026-11-16 | Supplied-magnet pole test | Supplied disc and two comparison discs; HW-993/AS5600 direct-register stream; discs held edge-on and flipped between their flat faces | Supplied disc changed raw angle `1060 -> 3108` (exactly 2048 counts / 180 degrees); comparison discs behaved similarly. Face-on axial spin did not track angle | All previously tried discs are axial. This explains why strong signal was available only in misleading off-axis/edge-on arrangements and why normal face-on rotation failed |
+| 2026-11-16 | Purchased diametric magnet bench test | Separately purchased diametric disc centred face-on over HW-993; live angle and magnetic-strength plot | Angle changes smoothly with rotation and traverses/wraps the expected range while detection remains usable | AS5600 boards are functional; wrong supplied magnetization was the root cause. Proceed to installed test |
+| 2026-11-16 | Installed encoder test | Diametric disc inserted in printed pendulum; HW-993 inserted in arm/housing; Uno diagnostic stream and live plot | Rotation continues to track in the assembled geometry. Mechanical raw zero is offset from physical upright, as expected for an arbitrarily oriented magnet | Encoder blocker cleared. Establish upright with software tare/offset; inspect retention and cable routing before motor/autonomous tests |
 
 ## Definition of done
 
