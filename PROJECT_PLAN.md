@@ -158,8 +158,11 @@ Electronics bring-up:
 - [ ] Flash and pass `TestHeartbeat`.
 - [x] Flash and pass a guarded `TestMotor` motion check from the interim Uno at
   1/32 microstepping and 0.91 V Vref. The motor turned under 12 V and was
-  stopped with the motor-power switch. A longer mounted thermal/roughly ±90°
-  acceptance run remains part of the electrical gate below.
+  stopped with the motor-power switch. A later mounted ±5-degree test initially
+  twitched because the motor's 1+4 phase was open at a loose connection; after
+  reseating the leads, two repeat tests moved smoothly and consistently. A
+  longer mounted thermal/roughly ±90° acceptance run remains part of the
+  electrical gate below.
 - [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
 - [x] Compile all firmware sketches so missing libraries or toolchain problems
   are solved before final assembly. `TestMotor` compiled and flashed
@@ -184,7 +187,10 @@ Rig record:
 - Arduino Uno port (interim): `/dev/cu.usbmodem14701`
 - Driver: TMC2209 V985 (survived the brief reverse-polarity connections;
   unpowered VS-to-GND reads open and guarded `TestMotor` motion passed)
-- Motor: 42BL233.0-21A, 6-pin unipolar, coils on pins 1+4 and 3+6
+- Motor: 42BL233.0-21A, 6-pin unipolar, coils on pins 1+4 and 3+6. Current TMC
+  mapping: B2->1, B1->4, A2->3, A1->6; centre taps 2+5 unused. Whole-coil A/B
+  swaps are electrically valid, but the two endpoints of each coil must remain
+  on the same driver phase.
 - Microsteps: 1/32 (MS1=HIGH, MS2=LOW)
 - Vref/current setting: **0.91 V** (target about 0.9 V / 0.64 A RMS). The
   trimpot was not damaged: it had been resting against its clockwise end stop,
@@ -555,6 +561,8 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-16 | Supplied-magnet pole test | Supplied disc and two comparison discs; HW-993/AS5600 direct-register stream; discs held edge-on and flipped between their flat faces | Supplied disc changed raw angle `1060 -> 3108` (exactly 2048 counts / 180 degrees); comparison discs behaved similarly. Face-on axial spin did not track angle | All previously tried discs are axial. This explains why strong signal was available only in misleading off-axis/edge-on arrangements and why normal face-on rotation failed |
 | 2026-11-16 | Purchased diametric magnet bench test | Separately purchased diametric disc centred face-on over HW-993; live angle and magnetic-strength plot | Angle changes smoothly with rotation and traverses/wraps the expected range while detection remains usable | AS5600 boards are functional; wrong supplied magnetization was the root cause. Proceed to installed test |
 | 2026-11-16 | Installed encoder test | Diametric disc inserted in printed pendulum; HW-993 inserted in arm/housing; Uno diagnostic stream and live plot | Rotation continues to track in the assembled geometry. Mechanical raw zero is offset from physical upright, as expected for an arbitrarily oriented magnet | Encoder blocker cleared. Establish upright with software tare/offset; inspect retention and cable routing before motor/autonomous tests |
+| 2026-11-16 | Mounted ±5-degree motor test — failed wiring state | Temporary guarded Uno sketch; TMC2209 at 1/32 microstepping; slow ±5-degree target with explicit serial start/stop; motor clamped | Arm twitched, felt stuck and moved non-repeatably in both directions. With all power removed and motor leads disconnected from the TMC, meter baseline was 0.6 ohm; phase 3+6 measured about 4 ohm while phase 1+4 initially read open (`OL`) | One motor phase was open/intermittent. Do not blame the whole-coil A/B swap or continue powered testing; reseat the B2->1 and B1->4 connections and verify continuity first |
+| 2026-11-16 | Mounted ±5-degree motor retest — passed | Same sketch and hardware after reseating/reconnecting all four motor leads; mapping B2->1, B1->4, A2->3, A1->6 | Phase 1+4 recovered to about 5-6 ohm. Two powered ±5-degree runs were smooth and repeatable; serial stop disabled the driver after each run | Jitter root cause was the open/loose 1+4 phase connection. Small-angle actuator check passes; retain a power-off coil-continuity check after future motor rewiring |
 
 ## Definition of done
 
