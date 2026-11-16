@@ -61,7 +61,9 @@ The build guides and the canonical RL pipeline remain the source of truth.
   `TestMotor` turned the motor successfully from the interim Uno.
 - [ ] Mechanical assembly complete.
 - [ ] Electronics wired and inspected.
-- [ ] This rig has its own system-identification file.
+- [x] This rig has its own pendulum system-identification file locally:
+  `policy/sysid_params_rig3.json` (2026-11-16). It still needs to be reviewed
+  and committed with the accompanying local sysid-wizard fixes.
 - [ ] This rig has its own trained, fine-tuned, and distilled policy.
 - [ ] Standalone deployment passes the on-device balance gate.
 
@@ -128,6 +130,11 @@ gluing anything, verify and record here or in that page:
 - [ ] Arm-to-shaft coupling and zeroing method.
 - [ ] Pendulum bearing, shaft retention, fit, and free play.
 - [ ] Final cable route across the full travel range.
+- [ ] Create an unobstructed approximately 270-degree swept volume centred on
+  motor zero for autonomous swing-up. The clamped rig has proved smooth travel
+  through ±90 degrees (180 degrees total), but the policy's ±132-degree hard
+  limit and intended ±135-degree physical stops need about 264–270 degrees of
+  arm, pendulum, and wire clearance.
 
 Mechanical gate:
 
@@ -160,9 +167,10 @@ Electronics bring-up:
   1/32 microstepping and 0.91 V Vref. The motor turned under 12 V and was
   stopped with the motor-power switch. A later mounted ±5-degree test initially
   twitched because the motor's 1+4 phase was open at a loose connection; after
-  reseating the leads, two repeat tests moved smoothly and consistently. A
-  longer mounted thermal/roughly ±90° acceptance run remains part of the
-  electrical gate below.
+  reseating the leads, two repeat tests moved smoothly and consistently. Two
+  later guarded acceleration-mode sweeps through `0 -> +90 -> 0 -> -90 -> 0`
+  also ran smoothly, reached every target, and returned to centre. The driver
+  was disengaged after each run.
 - [ ] Flash and pass `TestSerial`; target roughly 2.5 ms round-trip latency.
 - [x] Compile all firmware sketches so missing libraries or toolchain problems
   are solved before final assembly. `TestMotor` compiled and flashed
@@ -379,26 +387,36 @@ Electrical gate:
   encoder dependency is cleared.
 - [x] **Encoder dependency cleared:** the AS5600 and separately purchased
   diametric magnet passed bench and installed functional-motion tests.
-- [ ] Flash `firmware/LowLevelServer` using the selected microstep setting.
-- [ ] Run the guided system-identification workflow:
+- [x] Flash `firmware/LowLevelServer` to the interim Uno using the selected
+  1/32 microstep setting.
+- [x] Run the guided pendulum system-identification workflow:
 
   ```bash
   cd policy
   uv run python sysid_wizard.py --out-json sysid_params_<rig>.json
   ```
 
-- [ ] Complete the hanging tare, three free-swing recordings, and motor ±90°
-  sanity sweep.
-- [ ] Inspect `freeswing_compare.png` and `motor_sweep.png` rather than accepting
-  the fitted numbers blindly.
+- [x] Complete the hanging tare and three clean free-swing recordings. The
+  motor sweep was deliberately skipped in that capture, then performed twice
+  as a separate guarded ±90-degree validation.
+- [x] Inspect the corrected `freeswing_compare.png` and both `motor_sweep.png`
+  plots rather than accepting the fitted numbers blindly. The first validation
+  plot exposed local plotter-state/timestamp issues; after correcting those
+  locally, measured and simulated periods were 515 ms and 500 ms (-3.0%).
 - [ ] Commit the resulting `sysid_params_<rig>.json`; keep raw recordings locally.
 
 Sysid gate:
 
-- [ ] Real and simulated free-swing traces agree closely.
-- [ ] CAD-predicted and measured inertia differ by no more than the documented
+- [x] Real and simulated free-swing periods agree closely; the corrected plot
+  differs by 3.0%. Late decay differences remain near the sensor/stiction floor.
+- [x] CAD-predicted and measured inertia differ by no more than the documented
   10% warning threshold, or the discrepancy has been explained.
-- [ ] Motor sweep reaches its targets without skipped steps.
+- [x] Motor sweep reaches its ±90-degree targets without skipped steps; two
+  guarded runs were smooth and returned to centre.
+- [ ] Before deploying any swing-up policy, provide approximately 270 degrees
+  of clear swept space around the zeroed arm. If the rig cannot provide that
+  travel, reduce the firmware/simulation limits and retrain the policy rather
+  than deploying against the current ±132-degree hard limit.
 
 ## Phase 4 — train the SAC teacher in simulation
 
@@ -563,6 +581,8 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-16 | Installed encoder test | Diametric disc inserted in printed pendulum; HW-993 inserted in arm/housing; Uno diagnostic stream and live plot | Rotation continues to track in the assembled geometry. Mechanical raw zero is offset from physical upright, as expected for an arbitrarily oriented magnet | Encoder blocker cleared. Establish upright with software tare/offset; inspect retention and cable routing before motor/autonomous tests |
 | 2026-11-16 | Mounted ±5-degree motor test — failed wiring state | Temporary guarded Uno sketch; TMC2209 at 1/32 microstepping; slow ±5-degree target with explicit serial start/stop; motor clamped | Arm twitched, felt stuck and moved non-repeatably in both directions. With all power removed and motor leads disconnected from the TMC, meter baseline was 0.6 ohm; phase 3+6 measured about 4 ohm while phase 1+4 initially read open (`OL`) | One motor phase was open/intermittent. Do not blame the whole-coil A/B swap or continue powered testing; reseat the B2->1 and B1->4 connections and verify continuity first |
 | 2026-11-16 | Mounted ±5-degree motor retest — passed | Same sketch and hardware after reseating/reconnecting all four motor leads; mapping B2->1, B1->4, A2->3, A1->6 | Phase 1+4 recovered to about 5-6 ohm. Two powered ±5-degree runs were smooth and repeatable; serial stop disabled the driver after each run | Jitter root cause was the open/loose 1+4 phase connection. Small-angle actuator check passes; retain a power-off coil-continuity check after future motor rewiring |
+| 2026-11-16 | Pendulum system identification | `LowLevelServer` on interim Uno; 1/32 microsteps; 12 V off for pendulum capture; three clean free swings after a 0.09 mrad hanging tare | Swing amplitudes 66/54/53 degrees; periods 524/512/520 ms; small-amplitude periods 516/506/514 ms; measured inertia `4.6885e-05 kg m²`, 5.4% above CAD; local output `policy/sysid_params_rig3.json`. Corrected validation gives real 515 ms versus simulated 500 ms (-3.0%) | Pendulum sysid gate passes. Keep raw recordings local; review and commit the parameter file and local plotter fixes separately |
+| 2026-11-16 | Guarded ±90-degree motor validation — passed twice | Base clamped; physical arm zero set in `LowLevelServer`; TMC2209 at 1/32; 12 V enabled only for each run; commanded `0 -> +90 -> 0 -> -90 -> 0` | Both runs reached the endpoints and centre smoothly, with no observed buzz, stall, skipped step, or collision; driver disengaged after each run | Motor validation passes. Pause here before policy deployment: rearrange the rig and cables to provide approximately 270 degrees of unobstructed swing-up travel centred on motor zero |
 
 ## Definition of done
 
