@@ -136,6 +136,27 @@ gluing anything, verify and record here or in that page:
   limit and intended ±135-degree physical stops need about 264–270 degrees of
   arm, pendulum, and wire clearance.
 
+### Clamp-mounted pedestal (2026-11-23)
+
+- [x] Created and geometrically checked a column-only motor pedestal, adapted
+  from the upstream motor plate's corner-holder layout. Files and printing
+  notes: [model/pedestal/README.md](model/pedestal/README.md).
+- Motor body specified as 42 × 42 mm; socket inner flats are 42.2 mm apart,
+  matching upstream. Nominal clearance is 0.1 mm per side, so snug retention
+  needs a physical fit test; there is no positive snap latch.
+- Motor underside sits 55 mm above the column bottom; corner grips add 9 mm
+  (64 mm total). Column is 46 × 46 mm, with rounded corners and no base flange,
+  for direct clamping. Upstream grips rise 10 mm above their motor seat.
+- Full print: [pedestal STL](model/pedestal/STL/pendulum_pedestal_55mm.stl).
+  First print: [fit-test STL](model/pedestal/STL/motor_fit_test.stl).
+  Editable STEP, parametric source, previews and verification results accompany
+  the STLs. Both meshes are watertight single bodies; the 55 mm seat and
+  42.2 mm socket were checked against the saved geometry.
+- [ ] Print the fit test and verify the motor seats without rocking or rotating.
+- [ ] Print the pedestal, clamp it securely, and verify retention and complete
+  arm/pendulum/wire clearance through the required approximately 270° sweep.
+  The clearance blocker remains open until this physical check passes.
+
 Mechanical gate:
 
 - [ ] Arm moves freely by hand without binding or pulling wires.
