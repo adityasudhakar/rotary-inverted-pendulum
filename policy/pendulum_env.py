@@ -368,7 +368,7 @@ def build_mjcf(p: PendulumParams) -> str:
             rgba="0.4 0.6 0.8 1"/>
 
       <body name="pendulum" pos="{ARM_LENGTH_M} 0 0">
-        <joint name="pendulum_joint" type="hinge" axis="1 0 0"
+      <joint name="pendulum_joint" type="hinge" axis="-1 0 0"
                damping="{p.pendulum_friction}"
                frictionloss="{p.pendulum_coulomb}"/>
         <inertial pos="0 0 -{d}" mass="{m}"

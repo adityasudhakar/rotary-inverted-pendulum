@@ -72,6 +72,12 @@ The build guides and the canonical RL pipeline remain the source of truth.
   real-rig upright catch. Several 20-second trials showed substantial repeated
   pendulum rotation, but no stable balance; connector looseness caused jitter
   until the motor leads were reseated.
+- [x] Simulator pendulum hinge direction corrected and validated against three
+  real runs (2026-11-25): changing the MuJoCo pendulum hinge axis from +X to
+  -X changed the measured-motor replay from opposite-signed to same-direction
+  motion. Across the first 3 s of the three runs, correlation is 0.92-0.93 and
+  angle RMSE is about 3-4 degrees; motor-path RMSE remains below 0.0033 rad.
+  This is a coordinate/model correction, not yet a policy balance result.
 
 ## Safety rules
 
@@ -613,6 +619,7 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-24 | Motor accel calibration | Uno/TMC2209; bounded 10/20/30 rad/s² step-response probe | Measured accelerations 9.42/20.52/31.88 rad/s²; estimated lag about 18 ms at 20–30 rad/s²; probe disengaged cleanly | Basic stepper acceleration tracks command; keep this measured delay in mind when improving the sim/controller |
 | 2026-11-24 | Slow position sweep and connector check | 45-degree sinusoidal position sweep, 2 cycles over 8 s | Smooth and repeatable when motor connector was seated; loose motor jumpers had caused earlier visible jitter | Reseat/check motor phase leads before policy runs |
 | 2026-11-24 to 2026-11-25 | Real-policy trials | Rig3 SAC teacher; 20 s per trial; 3 s settling; secured diametric magnet; logs kept in `/private/tmp` | Several runs produced repeated large pendulum swings/revolutions but no stable catch; outcomes varied significantly between runs. Clean settled starts confirmed, yet balance gate remained 0% in the logged tests. The 359.74-degree manual encoder check passed. | Real swing-up motion is possible, but the teacher does not yet balance reliably. Recheck sim/real coordinate and timing assumptions before retraining; treat any sign-flipped test as experimental, not a validated fix. |
+| 2026-11-25 | Simulator coordinate validation | Replay measured arm path through MuJoCo using the three saved 20-second logs | Original +X pendulum hinge produced an opposite-sign pendulum trace. Reversing the MuJoCo hinge axis to -X yielded +0.92-0.93 correlation and 3-4 degree angle RMSE over the first 3 s; motor-path RMSE <0.0033 rad | Coordinate correction is validated on these runs. Retrain/fine-tune from the Rig 3 checkpoint in the corrected sim; do not deploy the old checkpoint as though it had been retrained. |
 
 ## Definition of done
 
