@@ -114,6 +114,14 @@ def main(argv: list[str] | None = None) -> int:
                    help="position_delta mode: per-tick motor-target delta of "
                         "action × this (rad). Must match training (default 0.10).")
     p.add_argument("--duration-s", type=float, default=30.0)
+    p.add_argument("--settle-s", type=float, default=0.0,
+                   help="hold the engaged motor still for this many seconds "
+                        "before the policy loop starts, allowing the pendulum "
+                        "and encoder velocity window to settle")
+    p.add_argument("--flip-pendulum-sign", action="store_true",
+                   help="map the real encoder joint direction into the sim "
+                        "frame by negating pendulum angle and velocity before "
+                        "building the policy observation")
     p.add_argument("--device", default="cpu")
     p.add_argument("--dry-run", action="store_true",
                    help="run the loop but never engage the motor (sanity-check the protocol)")
@@ -252,6 +260,12 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 client.set_acceleration(0.0)
             print("Motor engaged.")
+            if args.settle_s > 0.0:
+                print(f"Settling for {args.settle_s:.1f}s before policy start ...")
+                time.sleep(args.settle_s)
+                settled = client.get_state()
+                print(f"Settled state: pendulum={settled.pendulum_pos_rad:+.4f} rad, "
+                      f"velocity={settled.pendulum_vel_rad_s:+.3f} rad/s")
         else:
             print("DRY RUN: motor stays disengaged.")
 
@@ -285,9 +299,15 @@ def main(argv: list[str] | None = None) -> int:
                               maxlen=action_smooth_window)
         if action_smooth_window > 1:
             print(f"Action smoothing: boxcar over last {action_smooth_window} actions")
+        if args.flip_pendulum_sign:
+            print("Pendulum observation sign: FLIPPED (real encoder → sim frame)")
 
         # Trajectory log buffers (sim convention throughout for ease of analysis)
         log_t_us = np.zeros(max_steps, dtype=np.int64)
+        # Host-clock timestamps expose control-loop jitter. Firmware time_us
+        # timestamps the sampled state, not when the next command was issued.
+        log_host_t_s = np.zeros(max_steps, dtype=np.float64)
+        host_t0 = None
         log_motor_pos = np.zeros(max_steps, dtype=np.float32)
         log_pen_pos = np.zeros(max_steps, dtype=np.float32)
         log_motor_vel = np.zeros(max_steps, dtype=np.float32)
@@ -304,6 +324,9 @@ def main(argv: list[str] | None = None) -> int:
                     time.sleep(sleep_for)
 
                 s = client.get_state()
+                host_now = time.monotonic()
+                if host_t0 is None:
+                    host_t0 = host_now
 
                 # Firmware frame end-to-end; values feed the observation
                 # as-is.
@@ -312,7 +335,9 @@ def main(argv: list[str] | None = None) -> int:
                 motor_vel = s.motor_vel_rad_s
                 pen_vel = s.pendulum_vel_rad_s
 
-                frame = make_obs(motor_pos, phi, motor_vel, pen_vel,
+                obs_phi = -phi if args.flip_pendulum_sign else phi
+                obs_pen_vel = -pen_vel if args.flip_pendulum_sign else pen_vel
+                frame = make_obs(motor_pos, obs_phi, motor_vel, obs_pen_vel,
                                  prev_action, obs_include_velocities)
                 if not obs_history:
                     obs_history.extend([frame] * obs_history_len)
@@ -406,6 +431,7 @@ def main(argv: list[str] | None = None) -> int:
                 # saved npz records `action_mode` so consumers can disambiguate.
                 if args.log:
                     log_t_us[loop_count] = s.time_us
+                    log_host_t_s[loop_count] = host_now - host_t0
                     log_motor_pos[loop_count] = motor_pos
                     log_pen_pos[loop_count] = phi
                     log_motor_vel[loop_count] = motor_vel
@@ -445,14 +471,16 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Honest balance (|θ|≤15° AND |θ̇|≤{BAL_PEN_VEL_RAD_S:.0f} rad/s): "
                       f"fraction {bal_steps / loop_count:.3f}, "
                       f"longest streak {bal_streak_max * dt:.2f} s, "
-                      f"pendulum travel {phi_travel / (2 * math.pi):.1f} rev "
-                      f"(spinning if ≫1 after swing-up)")
+                      f"cumulative pendulum travel "
+                      f"{phi_travel / (2 * math.pi):.1f} turn-equivalents "
+                      f"(back-and-forth adds up; not completed revolutions)")
 
             if args.log and loop_count > 0:
                 Path(args.log).parent.mkdir(parents=True, exist_ok=True)
                 np.savez(
                     args.log,
                     time_us=log_t_us[:loop_count],
+                    host_time_s=log_host_t_s[:loop_count],
                     motor_pos_rad=log_motor_pos[:loop_count],
                     pendulum_pos_rad=log_pen_pos[:loop_count],
                     motor_vel_rad_s=log_motor_vel[:loop_count],
@@ -464,6 +492,7 @@ def main(argv: list[str] | None = None) -> int:
                     max_velocity_rad_s=np.float32(args.max_velocity_rad_s),
                     max_action_delta_rad=np.float32(args.max_action_delta_rad),
                     action_mode=str(args.action_mode),
+                    flip_pendulum_sign=np.bool_(args.flip_pendulum_sign),
                     policy_path=str(args.policy),
                 )
                 print(f"Saved trajectory log to {args.log}")

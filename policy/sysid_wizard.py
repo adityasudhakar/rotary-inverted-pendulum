@@ -570,7 +570,9 @@ def fit_data(in_dir: Path, out_json: Path) -> dict:
     print(_green(f"\n  Wrote {out_json}"))
 
     # Generate validation plots
-    plot_free_swing_compare(in_dir, derived, out_dir=in_dir)
+    plot_free_swing_compare(
+        in_dir, derived, out_dir=in_dir, params_path=out_json
+    )
     if (in_dir / "motor_sweep.npz").exists():
         plot_motor_sweep(in_dir / "motor_sweep.npz", out_dir=in_dir)
 
@@ -581,7 +583,13 @@ def fit_data(in_dir: Path, out_json: Path) -> dict:
 # Plotting
 # ---------------------------------------------------------------------------
 
-def plot_free_swing_compare(in_dir: Path, derived: dict, *, out_dir: Path) -> None:
+def plot_free_swing_compare(
+    in_dir: Path,
+    derived: dict,
+    *,
+    out_dir: Path,
+    params_path: Path | None = None,
+) -> None:
     """Replay the longest free-swing in sim and compare envelopes.
 
     Time-aligned to the actual release moment, not the recording start —
@@ -624,6 +632,7 @@ def plot_free_swing_compare(in_dir: Path, derived: dict, *, out_dir: Path) -> No
     # the sysid params at construction time, so we rely on `fit_data` having
     # just written that file.
     env = RotaryInvertedPendulumEnv(
+        params_path=params_path,
         control_freq_hz=200.0, domain_randomization=False,
         episode_length_s=real_t_trim[-1] + 0.5,
     )
@@ -632,19 +641,35 @@ def plot_free_swing_compare(in_dir: Path, derived: dict, *, out_dir: Path) -> No
     env.data.qpos[env._pen_qpos_addr]   = release_pos
     env.data.qvel[env._motor_qvel_addr] = 0.0
     env.data.qvel[env._pen_qvel_addr]   = release_vel
-    env._motor_target = 0.0; env._motor_vel = 0.0
+    # reset() randomises the initial motor pose for training diversity. We
+    # overwrite that pose for this fixed-arm validation, so every actuator
+    # state derived from it must be overwritten too. Leaving _prev_cmd_pos at
+    # the random reset angle makes the first step interpolate a large target
+    # jump, injecting an artificial impulse that can spin the pendulum hundreds
+    # of revolutions and render the comparison plot meaningless.
+    env._motor_target = 0.0
+    env._lagged_target = 0.0
+    env._prev_cmd_pos = 0.0
+    env._motor_vel = 0.0
+    env.data.ctrl[0] = 0.0
     mujoco.mj_forward(env.model, env.data)
 
     n = len(real_t_trim)
     sim_pen = np.zeros(n)
     sim_dt = 1.0 / 200.0
-    t = 0.0; idx = 0; next_t = 0.0
+    t = 0.0
+    idx = 0
     while idx < n:
         env.step(np.array([0.0], dtype=np.float32))
         t += sim_dt
-        while idx < n and t >= next_t:
+        # The serial recorder targets 100 Hz, but host scheduling makes its
+        # timestamps nonuniform. Sample the simulation at those actual times.
+        # Advancing by the median sample interval and then plotting against the
+        # real timestamps stretches/compresses simulated time whenever the mean
+        # and median recorder intervals differ.
+        while idx < n and t >= real_t_trim[idx]:
             sim_pen[idx] = float(env.data.qpos[env._pen_qpos_addr])
-            idx += 1; next_t += sample_dt
+            idx += 1
 
     # Use trimmed arrays for the rest of the function.
     real_t = real_t_trim
@@ -665,7 +690,7 @@ def plot_free_swing_compare(in_dir: Path, derived: dict, *, out_dir: Path) -> No
         decay = -float(np.polyfit(pt, np.log(pa + 1e-9), 1)[0])
         return period, decay, pt, pa
 
-    ix_start = int(0.3 / sample_dt)
+    ix_start = int(np.searchsorted(real_t, 0.3))
     fr = _fit(real_t[ix_start:], real_pen[ix_start:])
     fs = _fit(real_t[ix_start:], sim_pen[ix_start:])
 

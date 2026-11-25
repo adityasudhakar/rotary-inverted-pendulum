@@ -1,0 +1,93 @@
+{
+  "pendulum": {
+    "derived": {
+      "coulomb_friction_N_m": 4.411566345084567e-06,
+      "inertia_measured_kg_m2": 4.688481281016795e-05,
+      "inertia_predicted_kg_m2": 4.4473999999999995e-05,
+      "viscous_friction_N_m_s": 4.805717828573222e-05
+    },
+    "fit": {
+      "decay_constant_s_inv": 0.5402839668765146,
+      "decay_constant_s_inv_all_runs": [
+        0.5778323617481207,
+        0.5402839668765146,
+        0.45261318620744667
+      ],
+      "decay_constant_s_inv_stdev": 0.0524678628237684,
+      "decay_constant_visc_only_s_inv": 0.651585392894841,
+      "delta_c_per_half_cycle_rad": 0.0012596665339159913,
+      "delta_c_per_half_cycle_rad_all_runs": [
+        0.0,
+        0.0012596665339159913,
+        0.004036077121311498
+      ],
+      "delta_c_per_half_cycle_rad_stdev": 0.0016860583242727168,
+      "envelope_rmse_combined_rad": 0.02679687000110083,
+      "envelope_rmse_visc_only_rad": 0.09308948424349607,
+      "initial_amplitude_rad": 4.059309706854398,
+      "mean_pair_amplitude_rad": 0.3194975863745944,
+      "median_run_index": 2,
+      "n_extrema_used": 24,
+      "n_runs": 3,
+      "omega_d_rad_s": 12.088125976619663,
+      "omega_d_rad_s_all_runs": [
+        12.001759478732334,
+        12.282611781455143,
+        12.088125976619663
+      ],
+      "omega_d_rad_s_stdev": 0.1174553892545929,
+      "omega_n_rad_s": 12.09659655948548,
+      "omega_n_rad_s_all_runs": [
+        12.0156614809017,
+        12.29448896615083,
+        12.09659655948548
+      ],
+      "omega_n_rad_s_stdev": 0.11712133219278785,
+      "omega_n_small_amp_rad_s": 12.22271024496183,
+      "omega_n_small_amp_rad_s_all_runs": [
+        12.166129825821004,
+        12.419225937262018,
+        12.22271024496183
+      ],
+      "omega_n_small_amp_rad_s_stdev": 0.10846269342084403,
+      "period_s": 0.5197815872644159,
+      "period_s_all_runs": [
+        0.5235220151106742,
+        0.5115512416232377,
+        0.5197815872644159
+      ],
+      "period_s_stdev": 0.00500032007568668,
+      "r_per_half_cycle": 0.8709319210217054,
+      "r_per_half_cycle_all_runs": [
+        0.8596293412314292,
+        0.8709319210217054,
+        0.8890249308400489
+      ],
+      "r_per_half_cycle_stdev": 0.012106958525486357,
+      "rest_angle_rad": 0.00724488253518939,
+      "small_amp_period_s": 0.5140582719589135,
+      "small_amp_period_s_all_runs": [
+        0.5164489773768774,
+        0.5059240679668959,
+        0.5140582719589135
+      ],
+      "small_amp_period_s_stdev": 0.004504990628520953,
+      "zeta": 0.043945215483459595,
+      "zeta_all_runs": [
+        0.04808993351440174,
+        0.043945215483459595,
+        0.03741657283366473
+      ],
+      "zeta_stdev": 0.00439346093170597
+    }
+  },
+  "run_meta": {
+    "collected_at": "2026-11-16T15:35:45",
+    "firmware": "LowLevelServer.ino",
+    "fitted_at": "2026-11-16T15:41:19",
+    "hanging_zero_rad": 0.0,
+    "in_dir": "/Users/hellouser/rotary-inverted-pendulum/policy/sysid_runs/2026-11-16_153524",
+    "n_free_swing_runs": 3,
+    "wizard_version": "2026-05-20"
+  }
+}

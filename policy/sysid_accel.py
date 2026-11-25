@@ -103,19 +103,43 @@ def waveform_chirp(t: float) -> float:
 CHIRP_DURATION_S = 9.0
 
 
+def waveform_gentle(t: float) -> float:
+    """Two mirrored, zero-net-velocity rocking pulses at only 20 rad/s².
+
+    Each +A/-A/+A sequence has durations T/2T/T, so it returns both motor
+    velocity and position close to their starting values. The mirrored second
+    pulse exposes directional asymmetry while keeping travel around 13 degrees.
+    """
+    A, T = 20.0, 0.15
+    if t < 0.40: return 0.0
+    if t < 0.40 + T: return +A
+    if t < 0.40 + 3 * T: return -A
+    if t < 0.40 + 4 * T: return +A
+    if t < 1.80: return 0.0
+    if t < 1.80 + T: return -A
+    if t < 1.80 + 3 * T: return +A
+    if t < 1.80 + 4 * T: return -A
+    return 0.0
+
+
+GENTLE_DURATION_S = 3.0
+
+
 # ---------------------------------------------------------------------------
 # Recording on real rig
 # ---------------------------------------------------------------------------
 
 def run_real(port: str, baud: int, waveform_fn, duration: float,
              sample_rate: float):
-    n = int(duration * sample_rate)
     period = 1.0 / sample_rate
 
-    log_t = np.zeros(n)
-    log_accel = np.zeros(n)
-    log_motor = np.zeros(n)
-    log_pen = np.zeros(n)
+    # Leave ample room for a slower-than-requested serial loop. Waveform phase
+    # is driven by monotonic time below, never by row number.
+    n_max = int(duration * sample_rate * 1.5) + 32
+    log_t = np.zeros(n_max)
+    log_accel = np.zeros(n_max)
+    log_motor = np.zeros(n_max)
+    log_pen = np.zeros(n_max)
 
     with LowLevelClient(port, baud=baud) as client:
         if not client.wait_until_ready():
@@ -134,36 +158,76 @@ def run_real(port: str, baud: int, waveform_fn, duration: float,
 
         s0 = client.get_state()
         t0 = s0.time_us * 1e-6
-        initial_motor = -s0.motor_pos_rad   # sim-frame
-        initial_pen = -s0.pendulum_pos_rad  # sim-frame
+        # LowLevelServer and the sim now share one sign convention.
+        initial_motor = s0.motor_pos_rad
+        initial_pen = s0.pendulum_pos_rad
         print(f"  initial: motor={initial_motor:+.3f} rad, pendulum={initial_pen:+.3f} rad")
 
-        next_tick = time.monotonic()
+        start_host = time.monotonic()
+        next_tick = start_host
         overruns = 0
-        for i in range(n):
-            t_wf = i * period
+        i = 0
+        while i < n_max:
+            now = time.monotonic()
+            sleep_for = next_tick - now
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+
+            tick_host = time.monotonic()
+            t_wf = tick_host - start_host
+            if t_wf >= duration:
+                break
             accel = waveform_fn(t_wf)
             client.set_acceleration(accel)
             s = client.get_state()
-            log_t[i] = s.time_us * 1e-6 - t0
+            log_t[i] = t_wf
             log_accel[i] = accel
             log_motor[i] = s.motor_pos_rad
             log_pen[i] = s.pendulum_pos_rad
 
-            next_tick += period
-            sleep_for = next_tick - time.monotonic()
-            if sleep_for > 0:
-                time.sleep(sleep_for)
-            else:
+            if abs(s.motor_pos_rad - initial_motor) > 0.8:
+                raise RuntimeError(
+                    "motor moved more than 0.8 rad from its start; aborting probe"
+                )
+
+            i += 1
+            finished = time.monotonic()
+            if finished - tick_host > period:
                 overruns += 1
 
+            # Never issue back-to-back catch-up commands after a slow serial
+            # transaction. That was the source of the visibly jittery first
+            # coupling probe. Phase still follows real elapsed time.
+            next_tick = max(next_tick + period, finished + 0.001)
+
+        # moveByAcceleration(0) coasts; actively brake to rest first.
+        for _ in range(150):
+            s = client.get_state()
+            if abs(s.motor_vel_rad_s) < 0.10:
+                break
+            client.set_acceleration(-20.0 if s.motor_vel_rad_s > 0 else 20.0)
+            time.sleep(0.01)
         client.set_acceleration(0.0)
-        time.sleep(0.3)
+
+        # Gently restore the starting arm position outside the recorded probe.
+        for _ in range(150):
+            s = client.get_state()
+            err = initial_motor - s.motor_pos_rad
+            if abs(err) < 0.03 and abs(s.motor_vel_rad_s) < 0.15:
+                break
+            a_return = float(np.clip(18.0 * err - 7.0 * s.motor_vel_rad_s,
+                                     -20.0, 20.0))
+            client.set_acceleration(a_return)
+            time.sleep(0.02)
+
+        client.set_acceleration(0.0)
+        time.sleep(0.2)
         client.disengage_motor()
 
     if overruns:
-        print(f"  WARNING: {overruns}/{n} loop ticks overran the {1000*period:.1f} ms budget")
-    return log_t, log_accel, log_motor, log_pen, initial_motor, initial_pen
+        print(f"  WARNING: {overruns}/{i} loop ticks overran the {1000*period:.1f} ms budget")
+    return (log_t[:i], log_accel[:i], log_motor[:i], log_pen[:i],
+            initial_motor, initial_pen)
 
 
 # ---------------------------------------------------------------------------
@@ -171,11 +235,13 @@ def run_real(port: str, baud: int, waveform_fn, duration: float,
 # ---------------------------------------------------------------------------
 
 def run_sim(waveform_fn, duration: float, sample_rate: float,
-            initial_motor: float, initial_pen: float):
+            initial_motor: float, initial_pen: float,
+            params_path: Path | None = None):
     n = int(duration * sample_rate)
     period = 1.0 / sample_rate
 
     env = RotaryInvertedPendulumEnv(
+        params_path=params_path,
         control_freq_hz=sample_rate,
         domain_randomization=False,
         # The real side drives CMD_SET_ACCEL with no smoothing, so pin both
@@ -194,6 +260,8 @@ def run_sim(waveform_fn, duration: float, sample_rate: float,
     env.data.qpos[env._pen_qpos_addr] = float(initial_pen)
     env.data.qvel[:] = 0.0
     env._motor_target = float(initial_motor)
+    env._lagged_target = float(initial_motor)
+    env._prev_cmd_pos = float(initial_motor)
     env._motor_vel = 0.0
     env._prev_action = 0.0
     mujoco.mj_forward(env.model, env.data)
@@ -293,7 +361,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", default="/dev/cu.usbserial-1130",
                    help="serial port for the LowLevelServer-flashed Arduino")
     p.add_argument("--baud", type=int, default=2_000_000)
-    p.add_argument("--waveform", choices=["step", "chirp", "all"], default="all")
+    p.add_argument("--waveform", choices=["gentle", "step", "chirp", "all"], default="all")
+    p.add_argument("--params-path", type=Path, default=None,
+                   help="rig-specific sysid JSON used by the sim replay")
     p.add_argument("--sample-rate", type=float, default=SAMPLE_RATE_HZ,
                    help="state-sampling rate in Hz (max ~200 over 2 Mbaud)")
     p.add_argument("--skip-real", action="store_true",
@@ -301,6 +371,8 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv if argv is not None else sys.argv[1:])
 
     todo = []
+    if args.waveform in ("gentle", "all"):
+        todo.append(("gentle", waveform_gentle, GENTLE_DURATION_S))
     if args.waveform in ("step", "all"):
         todo.append(("step",  waveform_step,  STEP_DURATION_S))
     if args.waveform in ("chirp", "all"):
@@ -327,7 +399,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"pen range [{real_p.min():+.3f}, {real_p.max():+.3f}]")
 
         print(f"  replaying in sim (initial motor={initial_motor:+.3f}, pen={initial_pen:+.3f})...")
-        sim = run_sim(fn, dur, args.sample_rate, initial_motor, initial_pen)
+        sim = run_sim(fn, dur, args.sample_rate, initial_motor, initial_pen,
+                      params_path=args.params_path)
 
         out_npz = f"/tmp/sysid_accel_{name}.npz"
         np.savez(out_npz,

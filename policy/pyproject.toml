@@ -13,10 +13,16 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy",
     "scipy",
-    "mujoco",
+    # 3.10.0 is the newest release with an Intel macOS wheel.
+    "mujoco==3.10.0; platform_system == 'Darwin' and platform_machine == 'x86_64'",
+    "mujoco; platform_system != 'Darwin' or platform_machine != 'x86_64'",
     "gymnasium",
-    "stable-baselines3",
-    "torch>=2.4",
+    # PyTorch stopped publishing Intel macOS wheels after 2.2.2. SB3 2.4.1
+    # is the newest compatible release for that Torch version.
+    "stable-baselines3==2.4.1; platform_system == 'Darwin' and platform_machine == 'x86_64'",
+    "stable-baselines3; platform_system != 'Darwin' or platform_machine != 'x86_64'",
+    "torch==2.2.2; platform_system == 'Darwin' and platform_machine == 'x86_64'",
+    "torch>=2.4; platform_system != 'Darwin' or platform_machine != 'x86_64'",
     "tensorboard",
     "matplotlib",
     "pyserial",

@@ -66,6 +66,12 @@ The build guides and the canonical RL pipeline remain the source of truth.
   and committed with the accompanying local sysid-wizard fixes.
 - [ ] This rig has its own trained, fine-tuned, and distilled policy.
 - [ ] Standalone deployment passes the on-device balance gate.
+- [x] Encoder verified through a full manual turn after magnet retention fix
+  (2026-11-25): reported 359.74 degrees for one physical 360-degree turn.
+- [ ] The current sim-trained policy has not yet demonstrated a repeatable
+  real-rig upright catch. Several 20-second trials showed substantial repeated
+  pendulum rotation, but no stable balance; connector looseness caused jitter
+  until the motor leads were reseated.
 
 ## Safety rules
 
@@ -604,6 +610,9 @@ Add one row after each meaningful attempt so failed experiments remain useful.
 | 2026-11-16 | Mounted ±5-degree motor retest — passed | Same sketch and hardware after reseating/reconnecting all four motor leads; mapping B2->1, B1->4, A2->3, A1->6 | Phase 1+4 recovered to about 5-6 ohm. Two powered ±5-degree runs were smooth and repeatable; serial stop disabled the driver after each run | Jitter root cause was the open/loose 1+4 phase connection. Small-angle actuator check passes; retain a power-off coil-continuity check after future motor rewiring |
 | 2026-11-16 | Pendulum system identification | `LowLevelServer` on interim Uno; 1/32 microsteps; 12 V off for pendulum capture; three clean free swings after a 0.09 mrad hanging tare | Swing amplitudes 66/54/53 degrees; periods 524/512/520 ms; small-amplitude periods 516/506/514 ms; measured inertia `4.6885e-05 kg m²`, 5.4% above CAD; local output `policy/sysid_params_rig3.json`. Corrected validation gives real 515 ms versus simulated 500 ms (-3.0%) | Pendulum sysid gate passes. Keep raw recordings local; review and commit the parameter file and local plotter fixes separately |
 | 2026-11-16 | Guarded ±90-degree motor validation — passed twice | Base clamped; physical arm zero set in `LowLevelServer`; TMC2209 at 1/32; 12 V enabled only for each run; commanded `0 -> +90 -> 0 -> -90 -> 0` | Both runs reached the endpoints and centre smoothly, with no observed buzz, stall, skipped step, or collision; driver disengaged after each run | Motor validation passes. Pause here before policy deployment: rearrange the rig and cables to provide approximately 270 degrees of unobstructed swing-up travel centred on motor zero |
+| 2026-11-24 | Motor accel calibration | Uno/TMC2209; bounded 10/20/30 rad/s² step-response probe | Measured accelerations 9.42/20.52/31.88 rad/s²; estimated lag about 18 ms at 20–30 rad/s²; probe disengaged cleanly | Basic stepper acceleration tracks command; keep this measured delay in mind when improving the sim/controller |
+| 2026-11-24 | Slow position sweep and connector check | 45-degree sinusoidal position sweep, 2 cycles over 8 s | Smooth and repeatable when motor connector was seated; loose motor jumpers had caused earlier visible jitter | Reseat/check motor phase leads before policy runs |
+| 2026-11-24 to 2026-11-25 | Real-policy trials | Rig3 SAC teacher; 20 s per trial; 3 s settling; secured diametric magnet; logs kept in `/private/tmp` | Several runs produced repeated large pendulum swings/revolutions but no stable catch; outcomes varied significantly between runs. Clean settled starts confirmed, yet balance gate remained 0% in the logged tests. The 359.74-degree manual encoder check passed. | Real swing-up motion is possible, but the teacher does not yet balance reliably. Recheck sim/real coordinate and timing assumptions before retraining; treat any sign-flipped test as experimental, not a validated fix. |
 
 ## Definition of done
 

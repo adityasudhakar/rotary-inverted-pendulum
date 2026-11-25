@@ -152,6 +152,13 @@ MAX_ACTION_DELTA_RAD = 0.10
 CONTROL_FREQ_HZ = 50.0
 
 MAX_VELOCITY_RAD_S = 3.5
+# Velocity-mode actions request at most MAX_VELOCITY_RAD_S, but the physical
+# FastAccelStepper limit is independently set to 5 rad/s in LowLevelServer.
+# These must not be conflated: the acceleration interface can overshoot the
+# requested velocity while reversing, and the rig3 deployment log reached
+# 5.04 rad/s.  The old sim clipped the plant at 3.5 rad/s and therefore taught
+# the policy timing that the real actuator could not reproduce.
+MOTOR_SPEED_LIMIT_RAD_S = 5.0
 MAX_ACCEL_RAD_S2 = 150.0   # bumped from 100 after the first accel-mode
                             # deployment showed the policy saturating its
                             # accel command at ±99 repeatedly — needed more
@@ -401,7 +408,8 @@ class RotaryInvertedPendulumEnv(gym.Env):
         control_freq_hz: float = CONTROL_FREQ_HZ,  # see website/src/content/docs/reference/control-rate.md
         action_mode: str = "accel",  # "accel" (current) or "position_delta" (original)
         max_accel_rad_s2: float = MAX_ACCEL_RAD_S2,  # accel-mode: action × this = commanded angular accel
-        max_velocity_rad_s: float = MAX_VELOCITY_RAD_S,  # accel-mode: velocity saturation cap
+        max_velocity_rad_s: float = MAX_VELOCITY_RAD_S,  # velocity-mode action/setpoint scale
+        motor_speed_limit_rad_s: float = MOTOR_SPEED_LIMIT_RAD_S,  # firmware's physical speed cap
         max_action_delta_rad: float = MAX_ACTION_DELTA_RAD,  # position-mode: action × this = per-step target delta
         episode_length_s: float = 8.0,
         # Fraction of episodes that start NEAR UPRIGHT instead of hanging.
@@ -535,6 +543,7 @@ class RotaryInvertedPendulumEnv(gym.Env):
         self.action_mode = action_mode
         self.max_accel_rad_s2 = max_accel_rad_s2
         self.max_velocity_rad_s = max_velocity_rad_s
+        self.motor_speed_limit_rad_s = float(motor_speed_limit_rad_s)
         self.max_action_delta_rad = max_action_delta_rad
         self.episode_length_s = episode_length_s
         if not 0.0 <= upright_reset_frac <= 1.0:
@@ -1054,8 +1063,8 @@ class RotaryInvertedPendulumEnv(gym.Env):
                                        self._motor_max_accel_rad_s2))
             self._motor_vel = float(np.clip(
                 self._motor_vel + accel_cmd * actual_dt_s,
-                -self.max_velocity_rad_s,
-                self.max_velocity_rad_s,
+                -self.motor_speed_limit_rad_s,
+                self.motor_speed_limit_rad_s,
             ))
             # Complementary drift correction, mirroring the host: pull the
             # commanded integrator gently toward the measured velocity so
@@ -1151,6 +1160,7 @@ class RotaryInvertedPendulumEnv(gym.Env):
             "phi": float(self.data.qpos[self._pen_qpos_addr]),
             "motor_target": self._motor_target,
             "motor_vel_cmd": self._motor_vel,
+            "motor_speed_limit_rad_s": self.motor_speed_limit_rad_s,
             "motor_max_accel_rad_s2": self._motor_max_accel_rad_s2,
             "action_delay_steps": self._action_delay_steps,
             "action_lag_tau_s": self._action_lag_tau_s,

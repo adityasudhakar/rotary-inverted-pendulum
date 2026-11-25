@@ -31,6 +31,9 @@ def replay_in_sim(env: RotaryInvertedPendulumEnv, *,
     env.data.qpos[env._pen_qpos_addr] = initial_phi
     env.data.qvel[:] = 0.0
     env._motor_target = initial_motor
+    env._lagged_target = initial_motor
+    env._prev_cmd_pos = initial_motor
+    env._motor_vel = 0.0
     mujoco.mj_forward(env.model, env.data)
     if env.firmware_obs_model:
         # The ring was seeded by reset() from the random initial state;
@@ -70,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
                    help="fixed first-order action lag (s) applied in the sim "
                         "replay — set to the measured pipeline tau (~0.017) "
                         "to test whether the lag model explains the gap")
+    p.add_argument("--action-delay-steps", type=int, default=0,
+                   help="integer control-tick command delay applied in the replay")
+    p.add_argument("--params-path", type=Path, default=None,
+                   help="rig-specific sysid parameter JSON used by the replay")
     p.add_argument("--firmware-model", action="store_true",
                    help="enable the firmware measurement model (quantised, "
                         "stale, window-differenced state; velocity-mode "
@@ -109,8 +116,11 @@ def main(argv: list[str] | None = None) -> int:
         episode_length_s=n * dt_s + 1.0,  # plenty
         action_mode=action_mode,
         action_lag_tau_s=float(args.action_lag_tau),
+        action_delay_steps=int(args.action_delay_steps),
         firmware_obs_model=bool(args.firmware_model),
     )
+    if args.params_path is not None:
+        env_kwargs["params_path"] = args.params_path
     if args.staleness is not None:
         env_kwargs["obs_staleness_s"] = float(args.staleness)
     if "max_accel_rad_s2" in d:
@@ -122,7 +132,8 @@ def main(argv: list[str] | None = None) -> int:
     if "max_action_delta_rad" in d:
         env_kwargs["max_action_delta_rad"] = float(d["max_action_delta_rad"])
     print(f"  replay env: action_mode={action_mode}, "
-          f"lag tau={args.action_lag_tau*1000:.0f} ms, "
+          f"delay={args.action_delay_steps} tick(s), "
+          f"lag tau={args.action_lag_tau*1000:.1f} ms, "
           f"firmware_model={'ON' if args.firmware_model else 'off'}"
           + (f" (staleness {args.staleness*1000:.0f} ms)"
              if args.firmware_model and args.staleness is not None else ""))
